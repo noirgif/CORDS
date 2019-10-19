@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2
 # Copyright (c) 2016 Aishwarya Ganesan and Ramnatthan Alagappan.
 # All Rights Reserved.
 # 

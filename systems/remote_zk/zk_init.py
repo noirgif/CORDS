@@ -1,25 +1,25 @@
-#!/usr/bin/env  python
+#!/usr/bin/env python2
 
 import sys
 import os
 import time
 import subprocess
 import logging
+import json
 from kazoo.client import KazooClient
 from kazoo.client import KazooRetry
 
-remote_user_name = 'aishwarya'
-cords_dir = '/home/aishwarya/CORDS'
+with open('config.json') as cf:
+    config = json.load(cf)
+remote_user_name = config['remote_user_name']
+cords_dir = os.path.join(os.path.abspath(__file__), '../../')
 workload_home = cords_dir + '/systems/remote_zk/'
 
 #ZooKeeper code home, log file names
-zk_home = '/home/aishwarya/zookeeper/'
+zk_home = config['zk_home']
 servers = ['0', '1', '2']
 
-ips = {}
-ips['0'] = 'c220g1-030825.wisc.cloudlab.us'
-ips['1'] = 'c220g1-030828.wisc.cloudlab.us'
-ips['2'] = 'c220g1-030829.wisc.cloudlab.us'
+ips = config["ips"]
 
 def invoke_cmd(cmd):
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, 	stderr=subprocess.PIPE)
