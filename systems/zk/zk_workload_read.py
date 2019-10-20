@@ -17,7 +17,7 @@ def invoke_cmd(cmd):
 logging.basicConfig()
 host_list = ['127.0.0.2', '127.0.0.3', '127.0.0.4']
 port_list = [2182, 2183, 2184]
-config_info = '''tickTime=2000\ndataDir=%s\nclientPort=%s\ninitLimit=5\nsyncLimit=2\nserver.1=127.0.0.2:2888:3888\nserver.2=127.0.0.3:2889:3889\nserver.3=127.0.0.4:2890:3890\npreAllocSize=40'''
+config_info = '''tickTime=2000\ndataDir=%s\nclientPort=%s\ninitLimit=5\nsyncLimit=2\nserver.1=127.0.0.2:2888:3888\nserver.2=127.0.0.3:2889:3889\nserver.3=127.0.0.4:2890:3890\npreAllocSize=40\n'''
 
 #ZooKeeper code home, log file names
 ZK_HOME = '~/zookeeper-3.4.12/'
@@ -63,6 +63,7 @@ for i in [0, 1, 2]:
 	os.system(os.path.join(ZK_HOME, 'bin/zkServer.sh ') + ('start %s &') % (config_files[i],))
 os.chdir(CURR_DIR) 
 
+# Ruohui
 time.sleep(3)
 
 out = ''
@@ -94,65 +95,72 @@ if log_dir is not None:
 out = ''
 err = ''
 
+time.sleep(2)
 
-# Issue Reads on all the nodes in the cluster and check its value
-for server_index in range(1, 4):
-	returned = None
-	zk = None
-	
-	connect_string = host_list[server_index-1] + ':' + str(port_list[server_index-1])
-	kz_retry = KazooRetry(max_tries=1, delay=0.25, backoff=2)
-	zk = KazooClient(hosts=connect_string, connection_retry = kz_retry, command_retry = kz_retry, timeout = 1)
-	try:
-		zk.start()
-		returned, stat = zk.get("/zk_test")
-		zk.stop()
-		returned = returned.strip().replace('\n', '')
-		out += 'Successful get at server ' + str(server_index - 1) + ' Proper:' + str(returned == present_value)  + '\n'
-	except Exception as e:
-		err += 'Could not get at server ' + str(server_index - 1) + '\t:' + str(e) + '\n' 
-
-
-print out
-print err
-
-# Get state of ZooKeeper nodes after reading data
-if log_dir is not None:
-	assert os.path.isdir(log_dir) and os.path.exists(log_dir)
-	client_log_file = os.path.join(log_dir, 'log-client')
-	with open(client_log_file, 'a') as f:
-		f.write('out:\n' + str(out) + '\n')
-		f.write('err:\n' + str(err) + '\n')
-		p = 0
-		f.write('CLUSTER STATE:\n')
-		for host in host_list:
-			out, err = invoke_cmd('echo stat | nc ' + host + ' ' + str(port_list[p]) + ' | grep Mode')	
-			f.write(host + ':' + str(port_list[p]) + ':' + out.replace('\n', '') + '|'  + err.replace('\n', '') + '\n')
-			p += 1
-	
-if log_dir is not None:
-	client_log_file = os.path.join(log_dir, 'log-client')
-	with open(client_log_file, 'a') as f:
-		f.write('----------------------------------------------\n')
-		f.write('After workload\n')
-		out, err = invoke_cmd('ps aux | grep zoo')
-		to_write = ''
-		out = out.split('\n')
-		out = [i for i in out if i is not None and len(i) > 0 and ('zoo0.workload.cfg' in i or 'zoo1.workload.cfg' in i or 'zoo2.workload.cfg' in i)]
-		to_check = ['zoo0.workload.cfg', 'zoo1.workload.cfg', 'zoo2.workload.cfg']
-		for check in to_check:
-			found = False
-			for i in out:
-				if check in i:
-					found = True
-			to_write += check[:4] + ' running:' + str(found) + '\n'
-
-		f.write(to_write)
-
-time.sleep(3)
-# Kill the ZooKeeper nodes
-os.system("pkill -f \'java.*zoo*\'")
-time.sleep(1)
+try:    
+    # Issue Reads on all the nodes in the cluster and check its value
+    for server_index in range(1, 4):
+    	returned = None
+    	zk = None
+    	
+    	connect_string = host_list[server_index-1] + ':' + str(port_list[server_index-1])
+    	# Ruohui
+    	print(connect_string)
+    	kz_retry = KazooRetry(max_tries=1, delay=0.25, backoff=2)
+    	# Ruohui
+    	zk = KazooClient(hosts=connect_string, connection_retry = kz_retry, command_retry = kz_retry)
+    	# zk = KazooClient(hosts=connect_string, connection_retry = kz_retry, command_retry = kz_retry, timeout = 1)
+    	try:
+    		zk.start()
+    		returned, stat = zk.get("/zk_test")
+    		zk.stop()
+    		returned = returned.strip().replace('\n', '')
+    		out += 'Successful get at server ' + str(server_index - 1) + ' Proper:' + str(returned == present_value)  + '\n'
+    	except Exception as e:
+    		err += 'Could not get at server ' + str(server_index - 1) + '\t:' + str(e) + '\n' 
+    		# input('Press enter')
+    
+    
+    print out
+    print err
+    
+    # Get state of ZooKeeper nodes after reading data
+    if log_dir is not None:
+    	assert os.path.isdir(log_dir) and os.path.exists(log_dir)
+    	client_log_file = os.path.join(log_dir, 'log-client')
+    	with open(client_log_file, 'a') as f:
+    		f.write('out:\n' + str(out) + '\n')
+    		f.write('err:\n' + str(err) + '\n')
+    		p = 0
+    		f.write('CLUSTER STATE:\n')
+    		for host in host_list:
+    			out, err = invoke_cmd('echo stat | nc ' + host + ' ' + str(port_list[p]) + ' | grep Mode')	
+    			f.write(host + ':' + str(port_list[p]) + ':' + out.replace('\n', '') + '|'  + err.replace('\n', '') + '\n')
+    			p += 1
+    	
+    if log_dir is not None:
+    	client_log_file = os.path.join(log_dir, 'log-client')
+    	with open(client_log_file, 'a') as f:
+    		f.write('----------------------------------------------\n')
+    		f.write('After workload\n')
+    		out, err = invoke_cmd('ps aux | grep zoo')
+    		to_write = ''
+    		out = out.split('\n')
+    		out = [i for i in out if i is not None and len(i) > 0 and ('zoo0.workload.cfg' in i or 'zoo1.workload.cfg' in i or 'zoo2.workload.cfg' in i)]
+    		to_check = ['zoo0.workload.cfg', 'zoo1.workload.cfg', 'zoo2.workload.cfg']
+    		for check in to_check:
+    			found = False
+    			for i in out:
+    				if check in i:
+    					found = True
+    			to_write += check[:4] + ' running:' + str(found) + '\n'
+    
+    		f.write(to_write)
+finally:
+    time.sleep(3)
+    # Kill the ZooKeeper nodes
+    os.system("pkill -f \'java.*zoo*\'")
+    time.sleep(1)
 
 
 os.system("sudo chown -R $USER:$USER workload_dir*")

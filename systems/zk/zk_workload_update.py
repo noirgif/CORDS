@@ -13,7 +13,7 @@ logging.basicConfig()
 host_list = ['127.0.0.2', '127.0.0.3', '127.0.0.4']
 port_list = [2182, 2183, 2184]
 
-config_info = '''tickTime=2000\ndataDir=%s\nclientPort=%s\ninitLimit=5\nsyncLimit=2\nserver.1=127.0.0.2:2888:3888\nserver.2=127.0.0.3:2889:3889\nserver.3=127.0.0.4:2890:3890'''
+config_info = '''tickTime=2000\ndataDir=%s\nclientPort=%s\ninitLimit=5\nsyncLimit=2\nserver.1=127.0.0.2:2888:3888\nserver.2=127.0.0.3:2889:3889\nserver.3=127.0.0.4:2890:3890\n'''
 ZK_HOME = '/mnt/data1/scratch/work/adsl-work/d2s/applications/zookeeper-3.4.8/'
 ZK_HOME_BIN = '/mnt/data1/scratch/work/adsl-work/d2s/applications/zookeeper-3.4.8/bin'
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -39,7 +39,7 @@ server_config0 = (config_info) % (server_dirs[0], port_list[0], )
 server_config1 = (config_info) % (server_dirs[1], port_list[1], )
 server_config2 = (config_info) % (server_dirs[2], port_list[2], )
 
-config_files = [ os.path.join(CURR_DIR, 'zoo0.workload.cfg'), os.path.join(CURR_DIR, 'zoo1.workload.cfg'), os.path.join(CURR_DIR, 'zoo2.workload.cfg')]
+config_files = [ os.path.join(CURR_DIR, 'zoo0.workload.cfg'), os.path.join(CURR_DIR, 'zoo1.'), os.path.join(CURR_DIR, 'zoo2.workload.cfg')]
 with open(config_files[0], 'w') as f:
 	f.write(server_config0)
 
@@ -150,7 +150,7 @@ os.system("pkill -f \'java.*zoo*\'")
 os.system("pkill -f \'java.*zoo*\'")
 os.system("pkill -f \'java.*zoo*\'")
 time.sleep(1)
-os.system("sudo chown -R ram:ram workload_dir*")
+os.system("sudo chown -R $USER:$USER workload_dir*")
 os.system('rm -rf ' + config_files[0])
 os.system('rm -rf ' + config_files[1])
 os.system('rm -rf ' + config_files[2])

@@ -50,6 +50,10 @@ def kill_proc(proc, timeout):
 	proc.kill()
 
 def invoke_cmd(cmd):
+        # Ruohui: for debugging (reverted)
+	# p = subprocess.Popen(cmd, shell=True)
+	# out, err = p.communicate()
+        # return ('', '')
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	out, err = p.communicate()
 	return (out, err)
@@ -175,40 +179,44 @@ def cords_check():
 				subprocess.check_output("rm -rf " + data_dir_mount_points[corrupt_machine], shell = True)	
 				subprocess.check_output("mkdir " + data_dir_mount_points[corrupt_machine], shell = True)	
 
-				fuse_start_command = fuse_command_err%(data_dirs[corrupt_machine], data_dir_mount_points[corrupt_machine], corrupt_filename, block, err_type)
-				os.system(fuse_start_command)
-				os.system('sleep 1')
+    				fuse_start_command = fuse_command_err%(data_dirs[corrupt_machine], data_dir_mount_points[corrupt_machine], corrupt_filename, block, err_type)
+    				os.system(fuse_start_command)
+    				os.system('sleep 1')
+    				
+                                try:
+    				    data_dir_curr = []
+    				    for mach in machines:
+    				    	data_dir_curr.append(data_dir_mount_points[mach] if corrupt_machine == mach else data_dirs[mach])
+    				    assert len(data_dir_curr) == len(machines)				
+    
+    				    workload_command_curr = workload_command + " cords "
+    				    for ddc in data_dir_curr:
+    				    	workload_command_curr +=  ddc + " "
+    
+    				    workload_command_curr += log_dir_path + " "
+    
+				    os.system("rm -rf " + log_dir_path)
+				    os.system("mkdir -p " + log_dir_path)
+				    
+				    os.system("rm -rf /tmp/shoulderr")
+				    os.system("touch /tmp/shoulderr; echo \'fals\' >> /tmp/shoulderr")
 
-				data_dir_curr = []
-				for mach in machines:
-					data_dir_curr.append(data_dir_mount_points[mach] if corrupt_machine == mach else data_dirs[mach])
-				assert len(data_dir_curr) == len(machines)				
+                                    print(workload_command_curr)
+				    (out, err) = invoke_cmd(workload_command_curr)
+				    outfile = os.path.join(log_dir_path, 'workload.out')
+				    os.system("rm -rf " + outfile)
+				    os.system("touch " + outfile)
+				    with open(outfile, 'a') as f:
+				    	f.write(out + '\n' + err + '\n')
+				    os.system('mv /tmp/shoulderr ' + log_dir_path)
+				except Exception as e:
+				    print(e)
+				finally:
+			            fuse_unmount = fuse_unmount_command%(data_dir_mount_points[corrupt_machine]) 
+			            os.system(fuse_unmount)
+			            os.system('sleep 1')
+			            os.system('killall errfs')
 
-				workload_command_curr = workload_command + " cords "
-				for ddc in data_dir_curr:
-					workload_command_curr +=  ddc + " "
-
-				workload_command_curr += log_dir_path + " "
-
-				os.system("rm -rf " + log_dir_path)
-				os.system("mkdir -p " + log_dir_path)
-				
-				os.system("rm -rf /tmp/shoulderr")
-				os.system("touch /tmp/shoulderr; echo \'fals\' >> /tmp/shoulderr")
-
-				(out, err) = invoke_cmd(workload_command_curr)
-				outfile = os.path.join(log_dir_path, 'workload.out')
-				os.system("rm -rf " + outfile)
-				os.system("touch " + outfile)
-				with open(outfile, 'a') as f:
-					f.write(out + '\n' + err + '\n')
-					
-				fuse_unmount = fuse_unmount_command%(data_dir_mount_points[corrupt_machine]) 
-				os.system(fuse_unmount)
-				os.system('sleep 1')
-				os.system('killall errfs')
-
-				os.system('mv /tmp/shoulderr ' + log_dir_path)
 
 				for mach in machines:
 					os.system('cp -R ' + data_dirs[mach] + ' ' + log_dir_path)
