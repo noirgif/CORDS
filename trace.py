@@ -76,17 +76,17 @@ for i in range(0, machine_count):
 
 for i in range(0, machine_count):
 	print fuse_command_trace%(data_dirs[i], data_dir_mount_points[i], trace_files[i])
-	os.system(fuse_command_trace%(data_dirs[i], data_dir_mount_points[i], trace_files[i]))
+	subprocess.check_call(fuse_command_trace%(data_dirs[i], data_dir_mount_points[i], trace_files[i]), shell=True)
 
-os.system('sleep 1')
+subprocess.check_call('sleep 1', shell=True)
 
 workload_command +=  " trace " 
 for i in range(0, machine_count):
 	workload_command += data_dir_mount_points[i] + " "
-os.system(workload_command)
+subprocess.check_call(workload_command, shell=True)
 
 for mp in data_dir_mount_points:
-	os.system('fusermount -u ' + mp + '; sleep 1')
+	subprocess.check_call('fusermount -u ' + mp + '; sleep 1', shell=True)
 
 os.system('killall errfs >/dev/null 2>&1')
 
