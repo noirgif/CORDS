@@ -224,7 +224,7 @@ def cords_check():
                     subprocess.check_call('cp -R ' + data_dirs[mach] + ' ' + log_dir_path, shell=True)
 
                 if replay_check_needed:
-                    checker_command_curr = checker_command + ' ' + log_dir_path
+                    checker_command_curr = checker_command + ' "{}"'.format(log_dir_path)
                     print 'Invoking checker...'
                     subprocess.check_call(checker_command_curr, shell=True)
 
