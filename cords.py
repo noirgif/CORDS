@@ -50,10 +50,6 @@ def kill_proc(proc, timeout):
     proc.kill()
 
 def invoke_cmd(cmd):
-        # Ruohui: for debugging (reverted)
-    # p = subprocess.Popen(cmd, shell=True)
-    # out, err = p.communicate()
-        # return ('', '')
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     return (out, err)
@@ -130,13 +126,17 @@ for trace_file in trace_files:
 
 assert len(machines) > 0
 
+# Ruohui: now only test corruption and eio_1
 def get_error_modes(op):
     if op == 'r':
-        return ["eio", "cz", "cg"]
+        return ["cz", "cg"]
+        # return ["eio", "cz", "cg"]
     elif op == 'w': 
-        return ["eio"]
+        return []
+        # return ["eio"]
     elif op == 'a': 
-        return ["eio", "esp"]
+        return []
+        # return ["eio", "esp"]
     else:
         assert False
 
