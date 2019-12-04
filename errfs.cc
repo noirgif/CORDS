@@ -140,12 +140,22 @@ extern "C"
                 get<3>(f_cfg)[filename_index] = true;
 
                 // for reads we should not see enospc and edquot
-                assert(type == err_eio or type == corr_zero or type == corr_garbage or type == corr_similar);
-                if (type == err_eio)
+                assert(type == err_eio or type == corr_zero or type == corr_garbage or type == corr_similar or type == err_eio_once);
+                if (type == err_eio || type == err_eio_once)
                 {
                     assert(buf_index == -1 and len == -1);
                     errno = EIO;
                     ret = -errno;
+                    // Ruohui: remove error if err_eio_once
+                    if (type == err_eio_once)
+                    {
+                        int se_fd;
+                        se_fd = open("/tmp/triggered", O_CREAT | O_RDWR | O_APPEND, 0666);
+                        assert(se_fd > 0);
+                        assert(write(se_fd, "152\n", 4) == 4);
+                        assert(close(se_fd) == 0);
+                        // get<2>(f_cfg) = no_op;
+                    }
                 }
                 else if (type == corr_zero or type == corr_garbage)
                 {
@@ -216,7 +226,7 @@ extern "C"
             if (should_err)
             {
                 // no corruption for writes
-                assert(type == err_eio or type == err_enospc or type == err_edquot);
+                assert(type == err_eio or type == err_enospc or type == err_edquot or type == err_eio_once);
                 assert(buf_index == -1 and len == -1);
 
                 int se_fd;
@@ -231,12 +241,16 @@ extern "C"
                 assert(filename_index >= 0);
                 get<3>(f_cfg)[filename_index] = true;
 
-                if (type == err_eio)
+                if (type == err_eio || type == err_eio_once)
                     errno = EIO;
                 else if (type == err_enospc)
                     errno = ENOSPC;
                 else if (type == err_edquot)
                     errno = EDQUOT;
+
+                // Ruohui: remove error if err_eio_once
+                if (type == err_eio_once)
+                    get<2>(f_cfg) = no_op;
 
                 ret = -errno;
             }
@@ -248,6 +262,27 @@ extern "C"
                 // although ret may be lesser than size, we have never encountered that case
                 // in practice. if hit, can be changed to lesser or equal.
                 assert(ret == size);
+            }
+
+            // Ruohui: add overwrite
+            spec = fault_spec();
+            bool should_err_read = util::should_err(f_cfg, spec, path, offset, size, "read");
+            type = get<0>(spec);
+            // buf_index = get<1>(spec);
+            // len = get<2>(spec);
+            
+            bool err_overwritten = (type == corr_garbage || type == corr_zero || type == corr_similar);
+
+
+            if (should_err_read && err_overwritten) {
+                tuple<bool, int> res = util::is_err_file(get<0>(f_cfg), path);
+                int filename_index = get<1>(res);
+                bool fault_already_injected = get<3>(f_cfg)[filename_index];
+                // only overwrite after first read, otherwise the injection is useless
+                if (fault_already_injected) {
+                    // remove the error
+                    get<2>(f_cfg) = no_op;
+                }
             }
 
             return ret;
@@ -396,6 +431,8 @@ extern "C"
     int errfs_truncate(const char *path, off_t length)
     {
         int ret = 0;
+        // No need for removing errors, because truncated blocks are never touched again
+
         ret = truncate(path, length);
         if (ret < 0)
             return -errno;
@@ -662,11 +699,12 @@ extern "C"
             assert(argc == 8 or argc == 9);
             assert(string(argv[7]) == "eio" or string(argv[7]) == "cz" or
                    string(argv[7]) == "cg" or string(argv[7]) == "b" or
-                   string(argv[7]) == "esp" or string(argv[7]) == "edq");
+                   string(argv[7]) == "esp" or string(argv[7]) == "edq" or
+                   string(argv[7]) == "eio_1");
 
             if (string(argv[7]) == "eio" or string(argv[7]) == "cz" or
                 string(argv[7]) == "cg" or string(argv[7]) == "esp" or
-                string(argv[7]) == "edq")
+                string(argv[7]) == "edq" or string(argv[7]) == "eio_1")
             {
                 assert(argc == 8);
                 mcorrinfo blkcorr;
