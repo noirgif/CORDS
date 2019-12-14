@@ -1,0 +1,6 @@
+/tikv
+/pd
+/tidb-docker-compose/workdir
+results*
+*trace
+__pycache__
