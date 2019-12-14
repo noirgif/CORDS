@@ -29,6 +29,7 @@ import argparse
 
 ERRFS_HOME = os.path.dirname(os.path.realpath(__file__))
 fuse_command_trace = ERRFS_HOME + "/errfs -f -omodules=subdir,subdir=%s %s trace %s &"
+FNULL = open(os.devnull, 'w')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--trace_files', nargs='+', required = True, help = 'Trace file paths')
@@ -64,6 +65,7 @@ for i in range(0, machine_count):
 	data_dir_snapshots.append(os.path.join(uppath(data_dirs[i], 1), os.path.basename(os.path.normpath(data_dirs[i]))+ ".snapshot"))
 	data_dir_mount_points.append(os.path.join(uppath(data_dirs[i], 1), os.path.basename(os.path.normpath(data_dirs[i]))+ ".mp"))
 	subprocess.check_output("rm -rf " + data_dir_snapshots[i], shell = True)
+	subprocess.call("fusermount -u " + data_dir_mount_points[i], shell = True, stdout=FNULL, stderr=FNULL)
 	subprocess.check_output("rm -rf " + data_dir_mount_points[i], shell = True)
 	subprocess.check_output("mkdir " + data_dir_mount_points[i], shell = True)
 

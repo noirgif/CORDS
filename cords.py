@@ -178,6 +178,7 @@ def cords_check():
                     subprocess.check_output("rm -rf " + data_dirs[mach], shell = True)
                     subprocess.check_output("cp -R " + data_dir_snapshots[mach] + ' ' + data_dirs[mach], shell = True)
 
+                subprocess.call("fusermount -u " + data_dir_mount_points[corrupt_machine], shell = True, stdout=FNULL, stderr=FNULL)
                 subprocess.check_output("rm -rf " + data_dir_mount_points[corrupt_machine], shell = True)	
                 subprocess.check_output("mkdir " + data_dir_mount_points[corrupt_machine], shell = True)	
 
@@ -231,8 +232,8 @@ def cords_check():
                 count += 1
                 print 'States completed:' + str(count) + '/' + str(total)
 
-                # if count == 3:
-                #     return
+                # if count == 1:
+                #    return
 
 start_test = time.time()
 cords_check()
