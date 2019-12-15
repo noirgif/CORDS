@@ -32,6 +32,9 @@ from threading import Timer
 BLOCKSIZE = 4096
 
 ERRFS_HOME = os.path.dirname(os.path.realpath(__file__))
+FNULL = open(os.devnull, 'w')
+
+
 fuse_command_err = ERRFS_HOME + "/errfs -f -omodules=subdir,subdir=%s %s err %s %s %s &"
 fuse_unmount_command = "fusermount -u %s > /dev/null"
 uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
