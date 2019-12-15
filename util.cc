@@ -68,6 +68,8 @@ err_type util::err_type_for_string(std::string str)
         return err_enospc;
     else if(str == "edq")
         return err_edquot;
+    else if(str == "eio_1")
+        return err_eio_once;
     else
         assert(false);
 }
@@ -163,13 +165,14 @@ util::should_err(fault_config &cfg, fault_spec &spec, const string filename,
         if(get<0>(res)) 
         {
             assert(get<1>(res) >= 0);
-            if(err_mode == err_eio)
+            if(err_mode == err_eio || err_mode == err_eio_once)
             {
+                
                 for(int i = start_block_nr; i < start_block_nr + total_blocks_touched; i++)
                 {
                     if(i == get<1>(cfg).blocknr)
                     {
-                        spec = make_tuple(get<2>(cfg), -1, -1);
+                        spec = make_tuple(err_mode, -1, -1);
                         return true;
                     }
                 }
@@ -210,14 +213,12 @@ util::should_err(fault_config &cfg, fault_spec &spec, const string filename,
         if(get<0>(res)) 
         {
             assert(get<1>(res) >= 0);
-            if(err_mode == err_eio)
+            if(err_mode == err_eio || err_mode == err_eio_once)
             {            
                 for(int i = start_block_nr; i < start_block_nr + total_blocks_touched; i++)
                 {
                     if(i == get<1>(cfg).blocknr)
                     {
-                        // stupid - but for debugging.
-                        assert(err_mode == err_eio); 
                         spec = make_tuple(err_mode, -1, -1);
                         return true;
                     }

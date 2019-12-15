@@ -29,7 +29,7 @@
 // fault config
 enum fault_mode { err_eio = 42 , err_enospc /*43*/, err_edquot /*44*/,
                   corr_zero /*45*/, corr_garbage /*46*/, corr_similar /*47*/,
-                  no_op /*48*/};
+                  no_op /*48*/, err_eio_once};
 
 typedef std::string filepath;
 typedef std::vector<std::string> filenames;
