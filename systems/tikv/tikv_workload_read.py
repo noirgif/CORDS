@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from common import CURR_DIR, CORDS_HOME, logger_log, check_isup, invoke, checked_invoke
+from common import CURR_DIR, CORDS_HOME, TIKVCTL_PATH, logger_log, check_isup, invoke, checked_invoke
 
 
 def main():
@@ -56,10 +56,21 @@ def main():
 
     # no update when reading
     # checked_invoke("cd goclient && go run delete.go")
-    ret, outs, errs = invoke("cd goclient && go run lookup.go")
+    # ret, outs, errs = invoke("cd goclient && go run lookup.go")
+    for mach in range(3):
+        server_addr = "127.0.0.1:2016{}".format(mach)
+        ret, outs, errs = invoke("{} --host={} print -k za".format(TIKVCTL_PATH, server_addr))
 
-    logger_log(log_dir, outs)
-    logger_log(log_dir, errs)
+        if ret == 0 and outs[:5] == "value":
+            v = outs.strip()[len("value: "):]
+            assert(len(v) == 8192), v
+            logger_log("node{} correct value {}\n".format(mach, v == 8192 * 'a'))
+        else:
+            logger_log("node{} failed at request\n".format(mach))
+
+    # logger_log(log_dir, outs)
+    # logger_log(log_dir, errs)
+    logger_log('-' * 30 + '\n')
 
     # Check health state after starting
     if log_dir:

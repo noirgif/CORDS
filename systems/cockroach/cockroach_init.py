@@ -4,9 +4,7 @@ import sys
 import shutil
 import time
 import psycopg2
-
-COCKROACH_HOME='/mnt/data1/scratch/work/adsl-work/d2s/applications/cockroach/cockroach-beta-20160714.linux-amd64'
-CURR_DIR=os.path.dirname(os.path.realpath(__file__))
+from config import CURR_DIR, COCKROACH_HOME
 
 def stop_cluster():
 	# No -s 9!

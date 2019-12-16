@@ -6,6 +6,7 @@ from pathlib import Path
 # Warning: if the folder hierarchy changes, make sure to modify these variables to reflect the changes
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 CORDS_HOME = Path(__file__).parent.parent.parent.as_posix()
+TIKVCTL_PATH = '/home/noirgif/Documents/work/tikv/target/debug/tikv-ctl'
 
 def logger_log(log_dir, str):
 	if log_dir:
@@ -34,9 +35,9 @@ def check_isup(callback, retries=3, interval=5):
                 if "leader_size" in store["status"]:
                     callback('(leader) ')
                     leader = i
-                callback('tikv_{}: '.format(i))
+                callback('node{} is up '.format(i))
                 # Print if the store is up
-                callback(store["store"]["state_name"])
+                callback(str("Up" == store["store"]["state_name"]))
                 callback('\n')
             break
         else:

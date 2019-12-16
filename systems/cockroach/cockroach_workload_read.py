@@ -6,11 +6,14 @@ import time
 import psycopg2
 import subprocess
 import multiprocessing
+from config import CURR_DIR, COCKROACH_HOME
 
-CURR_DIR=os.path.dirname(os.path.realpath(__file__))
 server_dirs = []
 server_logs = []
 log_dir = None
+
+sys.argv.pop(1)
+print(' '.join(sys.argv))
 
 assert len(sys.argv) >= 4
 for i in range(1, 4):
@@ -40,8 +43,6 @@ os.system('killall cockroach')
 os.system('killall cockroach')
 
 time.sleep(3)
-
-COCKROACH_HOME='/mnt/data1/scratch/work/adsl-work/d2s/applications/cockroach/cockroach-beta-20160714.linux-amd64'
 
 os.system('%s/cockroach start --store=%s --log-dir=%s &'%(COCKROACH_HOME, server_dirs[0], server_logs[0]))
 os.system('%s/cockroach start --store=%s --log-dir=%s --port=26258 --http-port=8081 --join=localhost:26257 --join=localhost:26259 &'%(COCKROACH_HOME, server_dirs[1], server_logs[1]))

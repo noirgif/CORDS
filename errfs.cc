@@ -271,7 +271,7 @@ extern "C"
             // buf_index = get<1>(spec);
             // len = get<2>(spec);
             
-            bool err_overwritten = (type == corr_garbage || type == corr_zero || type == corr_similar);
+            bool err_overwritten = (type == corr_garbage || type == corr_zero || type == corr_similar || type == err_eio);
 
 
             if (should_err_read && err_overwritten) {

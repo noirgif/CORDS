@@ -5,11 +5,15 @@ import os
 import time
 import subprocess
 import logging
-import rethinkdb as r
+from rethinkdb import RethinkDB
+from pathlib import Path
+
+r = RethinkDB()
 
 logging.basicConfig()
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+CORDS_HOME = str(Path(os.path.realpath(__file__)).parents[2].absolute())
 
 os.system('docker rm $(docker stop -t 0 $(docker ps -aq)) > /dev/null')
 server_dirs = []
@@ -52,9 +56,6 @@ if len(sys.argv) == 6:
 	log_dir = sys.argv[-1]
 
 uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
-
-
-CORDS_HOME = '/home/ram/CORDS'
 
 master_start_command = 'docker run -d -v %s:/appdir -it --entrypoint=rethinkdb ramanala/ubuntu2 --server-tag master --directory %s --bind all --log-file %s'
 slave1_start_command = 'docker run -d -v %s:/appdir -it --entrypoint=rethinkdb ramanala/ubuntu2 --server-tag %s --join %s:29015 --directory %s --bind all --log-file %s'

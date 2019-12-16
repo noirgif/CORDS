@@ -11,3 +11,4 @@ for pd in "$DIR"/tidb-docker-compose/workdir/pd* ; do
     mkdir -p $L
     cp -rf "$pd/logs/$pdx.log" "$L"
 done
+exit 0

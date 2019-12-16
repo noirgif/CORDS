@@ -13,6 +13,8 @@ server_dirs = []
 server_logs = []
 log_dir = None
 
+sys.argv.pop(1)
+
 assert len(sys.argv) >= 4
 for i in range(1, 4):
 	server_dirs.append(sys.argv[i]) 

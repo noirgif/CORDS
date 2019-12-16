@@ -5,12 +5,13 @@ import os
 import time
 import subprocess
 import logging
-import rethinkdb as r
+from rethink import RethinkDB
+
+r = RethinkDB()
 
 logging.basicConfig()
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
-CORDS_HOME = '/mnt/data1/corrupt-ds-apps'
 
 uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
 

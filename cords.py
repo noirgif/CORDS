@@ -29,6 +29,9 @@ import argparse
 import time
 from threading import Timer
 
+# for sampling
+import random
+
 BLOCKSIZE = 4096
 
 ERRFS_HOME = os.path.dirname(os.path.realpath(__file__))
@@ -132,14 +135,14 @@ assert len(machines) > 0
 # Ruohui: now only test corruption and eio_1
 def get_error_modes(op):
     if op == 'r':
-        return ["cz", "cg"]
-        # return ["eio", "cz", "cg"]
-    elif op == 'w': 
-        return []
         # return ["eio"]
+        return ["eio", "cz", "cg"]
+    elif op == 'w': 
+        # return []
+        return ["eio"]
     elif op == 'a': 
-        return []
-        # return ["eio", "esp"]
+        # return []
+        return ["eio", "esp"]
     else:
         assert False
 
@@ -170,6 +173,11 @@ def cords_check():
         block_ops = list(err_map[key])
         
         for (op, block) in block_ops:
+            # Ruohui sample
+            #if random.random() < 0.9:
+            #    count += 1
+            #    continue
+
             possible_err_modes = get_error_modes(op)
             for err_type in possible_err_modes:
                 dir_index = str(corrupt_filename).rfind(data_dirs[corrupt_machine]) + len(data_dirs[corrupt_machine]) + 1			
@@ -236,7 +244,7 @@ def cords_check():
                 print 'States completed:' + str(count) + '/' + str(total)
 
                 # if count == 1:
-                #    return
+                #   return
 
 start_test = time.time()
 cords_check()

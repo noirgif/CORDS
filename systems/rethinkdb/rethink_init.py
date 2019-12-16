@@ -5,7 +5,9 @@ import os
 import time
 import subprocess
 import logging
-import rethinkdb as r
+from rethinkdb import RethinkDB
+
+r = RethinkDB()
 
 logging.basicConfig()
 
@@ -30,7 +32,8 @@ def invoke_cmd(cmd):
 	out, err = p.communicate()
 	return (out, err)
 
-CORDS_HOME = '/home/ram/CORDS'
+from pathlib import Path
+CORDS_HOME = str(Path(os.path.realpath(__file__)).parents[2].absolute())
 
 master_start_command = 'docker run -d -v %s:/appdir -it --entrypoint=rethinkdb ramanala/ubuntu2 --server-tag master --directory %s --bind all --log-file /dev/null'
 slave1_start_command = 'docker run -d -v %s:/appdir -it --entrypoint=rethinkdb ramanala/ubuntu2 --server-tag %s --join %s:29015 --directory %s --bind all --log-file /dev/null'
@@ -39,10 +42,11 @@ slave2_start_command = 'docker run -d -v %s:/appdir -it --entrypoint=rethinkdb r
 get_ip_cmd = 'docker inspect --format \'{{ .NetworkSettings.IPAddress }}\' %s'
 
 master_start_command = master_start_command%(CORDS_HOME, server_dirs[0],)
+print(master_start_command)
 master_cid, err = invoke_cmd(master_start_command)
 master_cid = master_cid.strip().replace('\n', '')
 assert master_cid is not None
-assert err is None or len(err) == 0
+assert err is None or len(err) == 0, err
 
 master_ip, err = invoke_cmd(get_ip_cmd%(master_cid))
 master_ip = master_ip.strip().replace('\n', '')
