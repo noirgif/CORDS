@@ -1,3 +1,7 @@
 [submodule "systems/gluster"]
 	path = systems/gluster
 	url = git@github.com:noirgif/gluster
+
+[submodule "systems/tikv/tidb-docker-compose"]
+	path = systems/tikv/tidb-docker-compose
+	url = git@github.com:noirgif/tidb-docker-compose
