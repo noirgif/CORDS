@@ -16,7 +16,9 @@
         *But it works when starting in mining mode, might not be the problem*
         *Retry running the code by piping into attach mode(worked once), or...*
         * Just find a way to stop mining
-        * Check `eth.pendingTransaction` once in a while
+        * <s>Check `eth.pendingTransaction` once in a while</s> use get transcript
+         * Promises/async does not work as geth is using a [shitty JSVM](https://geth.ethereum.org/docs/interface/javascript-console#Caveats)
+         * Used sim
 
 3. Check result
     a. how to check?
@@ -24,5 +26,7 @@
 
 4. Generate trace
     a. how to guarantee the same trace every time?
-        Haven't tried it yet. Make it run first.
+        * Copy snapshot?
+         * Also need to copy the user directory
+        
         

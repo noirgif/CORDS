@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 # Copyright (c) 2016 Aishwarya Ganesan and Ramnatthan Alagappan.
 # All Rights Reserved.
 # 
@@ -58,6 +58,8 @@ def kill_proc(proc, timeout):
 def invoke_cmd(cmd):
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
+    out = out.decode('utf-8')
+    err = err.decode('utf-8')
     return (out, err)
 
 def block_roundup(x):
@@ -73,7 +75,7 @@ def get_block_nrs(offset, size):
     
     assert total_blocks_touched >= 1
     start_block_nr = int(math.floor(start_offset / BLOCKSIZE))
-    return range(start_block_nr, start_block_nr + total_blocks_touched)
+    return list(range(start_block_nr, start_block_nr + total_blocks_touched))
 
 data_dir_snapshots = []
 data_dir_mount_points = []
@@ -96,6 +98,7 @@ workload_command = args.workload_command
 checker_command = args.checker_command
 cords_results_base_dir = args.cords_results_base_dir
 
+os.makedirs(cords_results_base_dir, exist_ok=True)
 subprocess.check_call('rm -rf ' + cords_results_base_dir+'/*', shell=True)
 
 replay_check_needed = False
@@ -184,7 +187,7 @@ def cords_check():
                 log_dir =  'result_' + (str(corrupt_machine) + '_' + str(corrupt_filename[dir_index :]) + '_' + str(block) + '_' + str(op) + '_' + str(err_type)).replace('/', '_')
                 log_dir_path =  os.path.join(cords_results_base_dir, log_dir)
                 
-                print str(op) + ' ' + str(corrupt_machine) + ':' + str(corrupt_filename) + ':' + str(block) + ':' + str(err_type)
+                print(str(op) + ' ' + str(corrupt_machine) + ':' + str(corrupt_filename) + ':' + str(block) + ':' + str(err_type))
                 for mach in machines:
                     subprocess.check_output("rm -rf " + data_dirs[mach], shell = True)
                     subprocess.check_output("cp -R " + data_dir_snapshots[mach] + ' ' + data_dirs[mach], shell = True)
@@ -217,6 +220,7 @@ def cords_check():
 
                     print(workload_command_curr)
                     (out, err) = invoke_cmd(workload_command_curr)
+
                     outfile = os.path.join(log_dir_path, 'workload.out')
                     subprocess.check_call("rm -rf " + outfile, shell=True)
                     subprocess.check_call("touch " + outfile, shell=True)
@@ -237,17 +241,17 @@ def cords_check():
 
                 if replay_check_needed:
                     checker_command_curr = checker_command + ' "{}"'.format(log_dir_path)
-                    print 'Invoking checker...'
+                    print('Invoking checker...')
                     subprocess.check_call(checker_command_curr, shell=True)
 
                 count += 1
-                print 'States completed:' + str(count) + '/' + str(total)
+                print('States completed:' + str(count) + '/' + str(total))
 
                 # if count == 1:
                 #   return
 
 start_test = time.time()
 cords_check()
-print 'cords-check done!'
+print('cords-check done!')
 end_test = time.time()
-print 'Testing took ' + str((end_test - start_test)) + ' seconds...'
+print('Testing took ' + str((end_test - start_test)) + ' seconds...')

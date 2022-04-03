@@ -1,4 +1,4 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 # Copyright (c) 2016 Aishwarya Ganesan and Ramnatthan Alagappan. 
 # All Rights Reserved.
 # 
@@ -141,4 +141,4 @@ for trace_file in trace_files:
 		with open(trace_file, 'w') as f:
 			f.write(to_write_final)
 
-print 'Tracing completed...'
+print('Tracing completed...')

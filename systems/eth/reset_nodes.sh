@@ -12,7 +12,7 @@ for i in {1..3} ; do
     geth --datadir blkchain-${i} init genesis.json
     # create for mining, also print the address for future connection
     geth --datadir blkchain-${i} --nodiscover --networkid 1234 --port $((30302+i)) js printenode.js >> nodes
-    geth --datadir blkchain-${i} --nodiscover --networkid 1234 --port $((30302+i)) js createaccount.js
+    cp keys/miner-${i} blkchain-${i}/keystore
 done
 
 # put the enode addresses of other nodes into the config file

@@ -17,7 +17,7 @@ function checkWork() {
                 miner.stop()
                 clearInterval(interval);
             }
-        }, 600)
+        }, 300)
     }
 }
 

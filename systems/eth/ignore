@@ -1,0 +1,8 @@
+geth.ipc
+geth/triecache
+geth/fastcache.tmp
+geth/chaindata/LOG
+geth/nodes/LOG
+geth/nodekey
+geth/static-nodes.json
+keystore

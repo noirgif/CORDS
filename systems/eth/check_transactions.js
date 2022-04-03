@@ -1,13 +1,20 @@
-for (let i = 1; i < 100; ++i)
+let transaction_mined = false;
+let transaction;
+
+function first_transaction()
 {
-        let block = eth.getBlockByNumber(i);
-        if (block === null)
-                break;
-        if (block.transactions.length > 0)
-        {
-                block.transactions.forEach(element => {
-                        let tx = eth.getTransaction(element);
-                        console.log(JSON.stringify(tx));
-                });
+        for (let i = 0; i < 10; i++) {
+                const block = eth.getBlockByNumber(i);
+                if (!block)
+                        break;
+                if (block.transactions.length > 0) {
+                        transaction = block.transactions[0];
+                        transaction_mined = true;
+                        console.log(block.transactions[0]);
+                        return;
+                }
         }
+        setTimeout(first_transaction, 1000);
 }
+
+first_transaction();

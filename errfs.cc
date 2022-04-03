@@ -92,7 +92,10 @@ extern "C"
     {
         FILE *dump;
         dump = fopen(dump_file.c_str(), "a+");
-        assert(dump);
+        if (!dump) {
+            printf("Can't open dump file %s\n", dump_file.c_str());
+            exit(1);
+        }
         fprintf(dump, "%s\t%s\t%d\t%d\n", filename.c_str(), op.c_str(), offset, size);
         fclose(dump);
         return 0;
