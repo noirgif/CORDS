@@ -1,6 +1,9 @@
 /tikv
 /pd
 /tidb-docker-compose/workdir
+/tidb-docker-compose/data
 results*
 *trace
 __pycache__
+readtrace
+readtrace_old
