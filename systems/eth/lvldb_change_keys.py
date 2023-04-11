@@ -10,10 +10,10 @@ elif len(sys.argv) == 2:
     db = leveldb.LevelDB(sys.argv[1])
     for k in db.RangeIter(include_value = False):
         v = db.Get(k)
-        try:
-            print('K', k, 'V', rlp.decode(v))
-        except rlp.exceptions.DecodingError:
-            print('K', k, 'V', v)
+        if k == b'SnapshotJournal':
+            new_v = v.replace(b'\xa0aaaaaaaaaaaaaaaaa', b'\xa0baaaaaaaaaaaaaaaa')
+            db.Put(k, new_v)
+            print("Successfully changed snapshot journal")
 else:
     # db1 = leveldb.LevelDB(sys.argv[1])
     # db2 = leveldb.LevelDB(sys.argv[2])

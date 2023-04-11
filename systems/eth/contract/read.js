@@ -2,14 +2,21 @@ const Web3 = require('web3');
 const fs = require('fs');
 const solc = require('solc');
 const path = require('path');
-const ethereumUri = 'http://127.0.0.1:8545';
+let ethereumUri = 'http://127.0.0.1:8545';
 
-let logpath;
+let logpath = '.';
+let log_file = 'read.log';
 
 if (process.argv.length > 2) {
         logpath = process.argv[2];
-} else {
-        logpath = '.';
+}
+
+if (process.argv.length > 3) {
+        log_file = process.argv[3];
+}
+
+if (process.argv.length > 4) {
+        ethereumUri = process.argv[4];
 }
 
 let provider = new Web3.providers.HttpProvider(ethereumUri);
@@ -23,6 +30,8 @@ if (web3.eth.personal.unlockAccount(accountAddress, accountPassword)) {
 } else {
         console.log(`unlock failed, ${accountAddress}`);
 }
+
+
 
 // compile contract
 const source = fs.readFileSync(path.join(__dirname, "Sample.sol"), 'utf8');
@@ -57,7 +66,7 @@ for (let sourceName in compiledContract.contracts) {
                 // console.log(myContractInstance);
                 myContractInstance.methods.getValue().call()
                         .then(function (result) {
-                                checker_logpath = path.join(logpath, 'read.log');
+                                checker_logpath = path.join(logpath, log_file);
 
                                 if (result == 'a'.repeat(16384)) {
                                         fs.writeFileSync(checker_logpath, 'Contract data validated');

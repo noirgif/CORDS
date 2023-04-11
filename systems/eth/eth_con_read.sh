@@ -10,6 +10,17 @@ else
     work_dirs=("" blkchain-{1,2,3})
 fi
 
+if [[ $1 == "trace" ]] ; then
+    trace_opt="--tracing"
+    if [[ !  $# -lt 5 ]] ; then
+        trace_dir=$5
+    else
+        trace_dir="trace"
+    fi
+    mkdir -p $trace_dir
+fi
+
+
 rm -rf "$file_dir"/blkchain-user.snapshot > /dev/null || true
 cp -R "$file_dir"/blkchain-user "$file_dir"/blkchain-user.snapshot
 
@@ -42,51 +53,59 @@ mkdir -p "${log_dir}"
 
 MINER=1
 
-# start mining
-for i in {1..3} ; do
-    #if [[ $i == "${MINER}" ]]; then
-        (cd "$file_dir" && nohup geth --config config/blkchain-"${i}${suffix[$i]}".toml js mine.js & ) &>> "${log_dir}/${i}.log"
-    #else
-    #    nohup geth --datadir blkchain-${i}"${suffix[$i]}" --nodiscover --networkid 1234 --port $((30302+i)) &>> ${i}.log &
-    #fi
-done
+# # start mining
+# for i in {1..3} ; do
+#     #if [[ $i == "${MINER}" ]]; then
+#         (cd "$file_dir" && nohup geth --config config/blkchain-"${i}${suffix[$i]}".toml js mine.js & ) &>> "${log_dir}/${i}.log"
+#     #else
+#     #    nohup geth --datadir blkchain-${i}"${suffix[$i]}" --nodiscover --networkid 1234 --port $((30302+i)) &>> ${i}.log &
+#     #fi
+# done
 
-# wait for all nodes to start
-t=0
+# # wait for all nodes to start
+# t=0
+# for i in {1..3} ; do
+#     while ! ls "$file_dir/blkchain-${i}${suffix[$i]}"/geth.ipc &> /dev/null ; do
+#         sleep 1
+#         t=$((t+1))
+#         if [[ $t -gt 20 ]] ; then
+#             echo "Geth $i didn't start in 20 seconds" > "${log_dir}/error"
+#             # if the single-block-miner didn't start, delegate to the next one
+#             if [[ $i -eq $MINER ]] ; then
+#                 MINER=$((i+1))
+#             fi
+#             break
+#         fi
+#     done
+# done
+
 for i in {1..3} ; do
-    while ! ls "$file_dir/blkchain-${i}${suffix[$i]}"/geth.ipc &> /dev/null ; do
-        sleep 1
-        t=$((t+1))
-        if [[ $t -gt 20 ]] ; then
-            echo "Geth $i didn't start in 20 seconds" > "${log_dir}/error"
-            # if the single-block-miner didn't start, delegate to the next one
-            if [[ $i -eq $MINER ]] ; then
-                MINER=$((i+1))
+    # check the results
+    if [[ "$1" != "debug" ]] ; then
+        # start miner node for requests
+        (cd "$file_dir" && nohup geth --config "config/blkchain-$i${suffix[$i]}.toml" --http --http.api=eth,net,web3,personal,web3 --allow-insecure-unlock $trace_opt --syncmode snap & ) &>> "${log_dir}/$i.log"
+        # wait for miner node to start
+        t=0
+        while ! ls "$file_dir/blkchain-$i${suffix[$i]}"/geth.ipc &> /dev/null ; do
+            sleep 1
+            t=$((t+1))
+            if [[ $t -gt 20 ]] ; then
+                    echo "Geth $i didn't start in 20 seconds" > "${log_dir}/error"
+                    break
             fi
-            break
-        fi
-    done
+        done
+
+    fi
 done
 
-# check the results
-if [[ "$1" != "debug" ]] ; then
-    # start user node for requests
-    (cd "$file_dir" && nohup geth --config config/blkchain-user.toml --http --http.api="eth,net,web3,personal,web3" --allow-insecure-unlock --syncmode=light & ) &>> "${log_dir}/user.log"
-    # wait for user node to start
-    t=0
-    while ! ls "$file_dir/blkchain-user${suffix[$i]}"/geth.ipc &> /dev/null ; do
-        sleep 1
-        t=$((t+1))
-        if [[ $t -gt 20 ]] ; then
-                echo "Geth user didn't start in 20 seconds" > "${log_dir}/error"
-                break
-        fi
-    done
-    
-    node "$file_dir/contract/read.js" "$log_dir" &>> "${log_dir}/eth_con_read.sh.log"
+for i in {1..3}; do
+    node "$file_dir/contract/read.js" "$log_dir" "read-$i.log" "http://127.0.0.1:$((8544+i))" &>> "${log_dir}/eth_con_read-$i.sh.log"
+done
 
-    # reset user state
-    rm -rf "$file_dir"/blkchain-user
-    cp -R "$file_dir"/blkchain-user.snapshot "$file_dir"/blkchain-user
-    "$file_dir"/stop.sh kill
+"$file_dir/stop.sh" kill
+
+if [[ -n $trace_opt ]] ; then
+    for i in {1..3} ; do     
+        grep '[trace]' "${work_dirs[$i]}/geth/chaindata/LOG" > "${trace_dir}/${i}.log"
+    done
 fi

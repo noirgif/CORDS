@@ -27,6 +27,6 @@
 4. Generate trace
     a. how to guarantee the same trace every time?
         * Copy snapshot?
-         * Also need to copy the user directory
+          * Also need to copy the user directory
         
         

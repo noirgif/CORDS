@@ -5,7 +5,8 @@ import subprocess
 import sys
 import json
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+file_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(file_dir)
 
 if len(sys.argv) == 2:
         path = sys.argv[1]
@@ -44,7 +45,7 @@ try:
         result = subprocess.run(['geth', '--config', configpath, 'js', 'get_transaction_temp.js'], timeout=30, capture_output=True)
         output = result.stdout.decode('utf-8')
         receipt = json.loads(output)
-        print(receipt, file=file)
+        print('Transaction receipt received', file=file)
 except subprocess.TimeoutExpired:
         print("Cannot obtain transaction receipt within 30s", file=file)
 except ValueError:
@@ -59,30 +60,40 @@ os.remove('get_transaction_temp.js')
 # if successfully mined
 # obtain the transaction data using the hash
 
-command = """
-let hash = "{}";
-let tx = eth.getTransaction(hash);
-console.log(JSON.stringify(tx));
-""".format(hash)
+# stop the nodes so that we can check them individually
+# TODO: is it the right way to do this? Should nodes be able to talk to each other
+# when the data is not available?
+subprocess.run([os.path.join(file_dir, 'stop.sh')])
+
+command = f"""
+let hash = "{hash}";
+if (eth.getTransactionReceipt(hash) != null) {{
+        let tx = eth.getTransaction(hash);
+        console.log(JSON.stringify(tx));
+}}
+"""
 
 with open('get_tx_temp.js', 'w') as f:
         f.write(command)
 
+# TODO: check if the transaction is mined
+# TODO: parse the output if we're using attach
+# no need for js
 for i in range(1, 4):
-        print("Testing node {}".format(i), file=file)
-
-        result = subprocess.run(['geth', '--config', configpath, 'js', 'get_tx_temp.js'], capture_output=True)
-        os.remove('get_tx_temp.js')
+        print("Testing node {}:".format(i), file=file, end=None)
+        miner_config_path = os.path.join('config', f'blkchain-{i}.toml')
+        # stop programs and use js, because attach doesn't work
+        result = subprocess.run(['geth', '--config', miner_config_path ,'js', 'get_tx_temp.js'], capture_output=True)
 
         output = result.stdout.decode('utf-8')
 
         try:
                 tx = json.loads(output)
                 if tx['input'] == '0x' + 'a' * 16384:
-                        print("Transaction data verified", file=file)
+                        print("transaction data verified", file=file)
                 else:
-                        print("Transaction data verification failed", file=file)
-                        exit(1)
+                        print("transaction data verification failed", file=file)
         except ValueError:
                 print("Error: not a valid transaction", output, file=file)
-                exit(1)
+
+os.remove('get_tx_temp.js')

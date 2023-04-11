@@ -10,7 +10,7 @@ function first_transaction()
                 if (block.transactions.length > 0) {
                         transaction = block.transactions[0];
                         transaction_mined = true;
-                        console.log(block.transactions[0]);
+                        console.log(JSON.stringify(eth.getTransactionReceipt(block.transactions[0])));
                         return;
                 }
         }

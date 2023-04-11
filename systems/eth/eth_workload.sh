@@ -31,27 +31,29 @@ fi
 if [[ -n "$5" ]] ; then
     log_dir="$5"
 else
-    log_dir="$(dirname "$0")"
+    log_dir="$(dirname "$0")/log"
 fi
 
 for i in {1..3} ; do
-    rm -rf $log_dir/log-$i || true
+    rm -rf $log_dir || true
 done
 
-# if [[ "$1" != "debug" ]] ; then
+mkdir -p "${log_dir}"
+
+# if the latter one is commented out, this one will be used
+if [[ "$1" != "debug" ]] ; then
     # if debug is provided, let the debugger to send the transaction
-# (cd "$file_dir" && geth --config config/blkchain-user.toml js send_transaction.js > "hash" )
-# fi
+    (cd "$file_dir" && geth --config config/blkchain-user.toml js send_transaction.js > "hash" )
+fi
 
 MINER=1
 
 # start mining
 for i in {1..3} ; do
-    mkdir -p "${log_dir}/log-${i}"
     #if [[ $i == "${MINER}" ]]; then
-        (cd "$file_dir" && nohup geth --config config/blkchain-"${i}${suffix[$i]}".toml js mine.js & ) &>> "${log_dir}/log-${i}/geth.log"
+        (cd "$file_dir" && nohup geth --config config/blkchain-"${i}${suffix[$i]}".toml js mine.js & ) &>> "${log_dir}/${i}.log"
     #else
-    #    nohup geth --datadir blkchain-${i}"${suffix[$i]}" --nodiscover --networkid 1234 --port $((30302+i)) &>> log-${i}/geth.log &
+    #    nohup geth --datadir blkchain-${i}"${suffix[$i]}" --nodiscover --networkid 1234 --port $((30302+i)) &>> ${i}.log &
     #fi
 done
 
@@ -73,32 +75,31 @@ for i in {1..3} ; do
 done
 
 # mine one block to make the miners sync
-# for i in {1..3} ; do
-#     if [[ $i == "${MINER}" ]]; then
-#         {   cd $file_dir
-#             echo "--- Attaching mining single block script ---" 
-#             if ! timeout -s KILL 10s geth attach "blkchain-${i}${suffix[$i]}/geth.ipc" < mine_single.js ; then
-#                 echo "Mining single block script didn't finish in ${MINER} in 10s" | tee "$curr_dir/$log_dir/error"
-#                 MINER=$((MINER+1))
-#             fi
-#             echo "--- Attached mining single block script ---"; 
-#             cd $curr_dir
-#         } >> "${log_dir}/log-${i}/geth.log"
-#     fi
-# done
+for i in {1..3} ; do
+    if [[ $i == "${MINER}" ]]; then
+        {   cd $file_dir
+            echo "--- Attaching mining single block script ---" 
+            if ! timeout -s KILL 10s geth attach "blkchain-${i}${suffix[$i]}/geth.ipc" < mine_single.js ; then
+                echo "Mining single block script didn't finish in ${MINER} in 10s" | tee "$curr_dir/$log_dir/error"
+                MINER=$((MINER+1))
+            fi
+            echo "--- Attached mining single block script ---"; 
+            cd $curr_dir
+        } >> "${log_dir}/${i}.log"
+    fi
+done
 
-if [[ "$1" != "debug" ]] ; then
-    # if debug is provided, let the debugger to send the transaction
-    (cd "$file_dir" && geth --config config/blkchain-user.toml js send_transaction.js > "hash" )
-fi
+# # Try if moving transaction to here works, spoiler: it don't
+# if [[ "$1" != "debug" ]] ; then
+#     # if debug is provided, let the debugger to send the transaction
+#     (cd "$file_dir" && geth --config config/blkchain-user.toml js send_transaction.js > "hash" )
+# fi
 
 # check the results
 if [[ "$1" != "debug" ]] ; then
     # if debug is provided, let the debugger to send the transaction
-    time $file_dir/check_results.py | tee "${log_dir}/checker.log"
+    $file_dir/check_results.py | tee "${log_dir}/checker.log"
     rm -rf "$file_dir"/blkchain-user
     cp -R "$file_dir"/blkchain-user.snapshot "$file_dir"/blkchain-user
+    "$file_dir"/stop.sh kill
 fi
-
-
-"$file_dir"/stop.sh kill

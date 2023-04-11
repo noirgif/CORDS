@@ -50,17 +50,15 @@ compiledContract = JSON.parse(output);
 const address = '0xbfc29b202C163ccB6fF64a5b1925569801d7aA44';
 web3.eth.defaultAccount = `0x${accountAddress}`;
 
-let result = '';
-
 for (let sourceName in compiledContract.contracts) {
         for (let contractName in compiledContract.contracts[sourceName]) {
                 let abi = compiledContract.contracts[sourceName][contractName].abi;
                 let myContractInstance = new web3.eth.Contract(abi, address);
                 // console.log(myContractInstance);
-                myContractInstance.methods.setValue('a'.repeat(128)).estimateGas(
+                myContractInstance.methods.restore().estimateGas(
                 ).then(function (gas) {
                         console.log(gas);
-                        return myContractInstance.methods.setValue('a'.repeat(128)).send({
+                        return myContractInstance.methods.restore().send({
                                 from: accountAddress,
                                 gas: gas
                         })

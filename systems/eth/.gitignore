@@ -3,3 +3,5 @@ traces
 results/*
 setup_log
 log-*
+node_modules
+log
