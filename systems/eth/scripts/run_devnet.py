@@ -10,6 +10,8 @@ from time import sleep
 from typing import List, Tuple
 from terminals import run_in_curses
 
+from web3 import Web3, IPCProvider
+
 
 def is_display_available():
     try:
@@ -33,7 +35,12 @@ GENESIS_JSON = None
 with open('genesis.json', 'r') as f:
     GENESIS_JSON = f.read()
 
-SECRET_JSON = '2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622'
+# (address: secret) pairs
+SECRET_JSON = {
+    '123463a4b065722e99115d6c222f267d9cabb524': '2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622',
+    "d8669b5dda8df27c5c5045b47484f32b8f37d21f": "142284a67faaa8dd2249c3c09ff5a9e8e63b44054b2628b6ba7faa80789189f5",
+    "e289d16d744c2f2466545e0a3b46a106c21db4f6": "4e54680e88d63d01dd0dcf89969d33e8aa98ded7762365a898d7b191713b5257"
+}
 
 NUM_NODES = 3
 
@@ -41,6 +48,7 @@ NODE_PATH: dict[int, Path] = {}
 GETH_PATH: dict[int, Path] = {}
 
 PEERS: List[str] = []
+GETH_PEERS: List[str] = []
 
 for i in range(1, NUM_NODES + 1):
     NODE_PATH[i] = DEVNET_PATH / f'node{i}'
@@ -57,9 +65,6 @@ def setup():
     with open('genesis.json', 'w') as f:
         f.write(GENESIS_JSON)
 
-    with open('secret.json', 'w') as f:
-        f.write(SECRET_JSON)
-
 
 def setup_node(no=1):
     node_path = NODE_PATH[no]
@@ -71,8 +76,10 @@ def setup_node(no=1):
 
     subprocess.run(['geth', '--datadir=' + str(geth_path), '--db.engine=pebble',
                    'init', str(DEVNET_PATH / 'genesis.json')], capture_output=True, text=True)
+    with open(geth_path / 'secret.json', 'w') as f:
+        f.write(tuple(SECRET_JSON.values())[no - 1])
     subprocess.run(['geth', '--datadir=' + str(geth_path), 'account', 'import',
-                   str(DEVNET_PATH / 'secret.json')], input='\n\n', capture_output=True, text=True)
+                   str(geth_path / 'secret.json')], input='\n\n', capture_output=True, text=True)
 
     with open(node_path / "jwt.hex", 'w') as f:
         f.write(subprocess.run(['openssl', 'rand', '-hex', '32'],
@@ -125,10 +132,10 @@ def start_node(no=1):
     node_path = NODE_PATH[no]
     geth_path = GETH_PATH[no]
 
-    geth_cmd = ['geth', '--http', '--http.api', "eth,engine", '--datadir=' + str(geth_path), '--allow-insecure-unlock', '--unlock=0x123463a4b065722e99115d6c222f267d9cabb524', '--password=/dev/null', '--nodiscover', '--syncmode=full', '--authrpc.jwtsecret', str(
+    geth_cmd = ['geth', '--http', '--http.api', "eth,engine", '--datadir=' + str(geth_path), '--allow-insecure-unlock', '--unlock=0x' + tuple(SECRET_JSON.keys())[no - 1], '--password=/dev/null', '--nodiscover', '--syncmode=full', '--authrpc.jwtsecret', str(
         node_path / "jwt.hex"), '--port', str(peer_port(no)), '--http.port', str(http_port(no)), '--ws.port', str(ws_port(no)), '--authrpc.port', str(authrpc_port(no)), '--db.engine=pebble']
 
-    print('Starting Geth for node', no, '...')
+    print('Starting Geth for node', no, ':', ' '.join(geth_cmd))
     geth_log = open(node_path / 'geth.log', 'w')
     if not TERMINAL:
         geth_proc = subprocess.Popen(
@@ -136,6 +143,15 @@ def start_node(no=1):
     else:
         geth_proc = subprocess.Popen(
             ['xfce4-terminal', '-e', ' '.join(geth_cmd)])
+
+    # Add geth node to peers list and connect it to existing nodes
+    ipc_path = geth_path / 'geth.ipc'
+    retry(lambda: ipc_path.exists())
+    node = Web3(IPCProvider(str(ipc_path)))
+    for peer in GETH_PEERS:
+        node.geth.admin.add_peer(peer)
+    enodeUrl = node.geth.admin.node_info()['enode']
+    GETH_PEERS.append(enodeUrl)
 
     # Before starting the beacon node, we need to generate the genesis state for it
     if not (node_path / 'genesis.ssz').exists():
@@ -150,6 +166,7 @@ def start_node(no=1):
         DEVNET_PATH / 'config.yml'), '--chain-id=32382', '--execution-endpoint=http://localhost:' + str(authrpc_port(no)), '--accept-terms-of-use', '--jwt-secret=' + str(node_path / "jwt.hex"), '--rpc-port', str(beacon_port(no)), '--no-discovery', *peers_argument]
 
     beacon_log = open(node_path / 'beacon.log', 'w')
+    print('Starting beacon node', no, ':', ' '.join(beacon_cmd))
     if not TERMINAL:
         beacon_proc = subprocess.Popen(
             beacon_cmd, stdout=beacon_log, stderr=beacon_log, text=True)
@@ -164,7 +181,7 @@ def start_node(no=1):
             DEVNET_PATH / 'config.yml'), '--config-file=' + str(DEVNET_PATH / 'config.yml'), '--grpc-gateway-port', str(validator_grpc_port(no)), '--rpc-port', str(validator_rpc_port(no))]
 
         validator_log = open(node_path / 'validator.log', 'w')
-
+        print('Starting validator node', no, ':', ' '.join(validator_cmd))
         if TERMINAL:
             validator_proc = subprocess.Popen(
                 ['xfce4-terminal', '-e', ' '.join(validator_cmd)])
@@ -172,26 +189,27 @@ def start_node(no=1):
             validator_proc = subprocess.Popen(
                 validator_cmd, stdout=validator_log, stderr=validator_log, text=True)
 
-        def get_peer():
-            peer_result = subprocess.run(
-                ['curl', 'localhost:8080/p2p'], capture_output=True, text=True).stdout.strip()
-            # example peer:
-            # bootnode=[]
-            # self=/ip4/172.17.195.116/tcp/13000/p2p/16Uiu2HAkzFu54hZr8ZB4mn9ZiKwc52bARDJdJMtnqbUDf5fMNmWk
-            # extract '/ip4/...' part
-            pattern = r"/ip4/[a-zA-Z0-9/\.]+"
-            match = re.search(pattern, peer_result)
+    # if it is the first node, we add it to the peers list
+    def get_peer():
+        peer_result = subprocess.run(
+            ['curl', 'localhost:8080/p2p'], capture_output=True, text=True).stdout.strip()
+        # example peer:
+        # bootnode=[]
+        # self=/ip4/172.17.195.116/tcp/13000/p2p/16Uiu2HAkzFu54hZr8ZB4mn9ZiKwc52bARDJdJMtnqbUDf5fMNmWk
+        # extract '/ip4/...' part
+        pattern = r"/ip4/[a-zA-Z0-9/\.]+"
+        match = re.search(pattern, peer_result)
 
-            if match:
-                ip4_part = match.group()
-                return ip4_part
+        if match:
+            ip4_part = match.group()
+            return ip4_part
 
-        peer = retry(get_peer)
-        if peer:
-            PEERS.append(retry(get_peer))
-        else:
-            print("Could not get peer")
-            return ()
+    peer = retry(get_peer)
+    if peer:
+        PEERS.append(retry(get_peer))
+    else:
+        print("Could not get peer")
+        return ()
 
     return geth_proc, beacon_proc, validator_proc
 
@@ -218,7 +236,7 @@ def check_error(*procs: Tuple[List[subprocess.Popen]] | Tuple[dict[subprocess.Po
 if __name__ == '__main__':
     os.system(f"killall -SIGINT validator geth beacon-chain")
     os.system(f"rm -rf {DEVNET_PATH}")
-    
+
     setup()
     setup_node(1)
     setup_node(2)
