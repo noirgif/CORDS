@@ -1,6 +1,7 @@
 {
 	"config": {
 		"chainId": 32382,
+		"consensus": "clique",
 		"homesteadBlock": 0,
 		"daoForkSupport": true,
 		"eip150Block": 0,
@@ -14,11 +15,14 @@
 		"muirGlacierBlock": 0,
 		"berlinBlock": 0,
 		"londonBlock": 0,
+		"terminalBlockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"arrowGlacierBlock": 0,
 		"grayGlacierBlock": 0,
-
-		"terminalTotalDifficulty": 1,
-		"shanghaiTime": 1
+		"clique": {
+			"period": 5,
+			"epoch": 30000
+		},
+		"terminalTotalDifficulty": 50
 	},
 	"nonce": "0x0",
 	"timestamp": "0x6439a649",

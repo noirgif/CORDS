@@ -5,3 +5,4 @@ setup_log
 log-*
 node_modules
 log
+__pycache__

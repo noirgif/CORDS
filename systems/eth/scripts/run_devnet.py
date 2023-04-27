@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
 import itertools
+import json
 import os
 import re
+import shutil
 import subprocess
 import signal
 from pathlib import Path
 from time import sleep
+import time
 from typing import List, Tuple
 from terminals import run_in_curses
 
@@ -26,26 +29,24 @@ TERMINAL = False
 os.chdir(Path(__file__).parent)
 
 DEVNET_PATH = Path('/dev/shm/devnet')
+if 'DEVNET_PATH' in os.environ:
+    DEVNET_PATH = Path(os.environ['DEVNET_PATH']).absolute()
+
+CONFIG_SUFFIX='-work'
 
 CONFIG_YML = None
-with open('prysm.yml', 'r') as f:
+with open(f'prysm{CONFIG_SUFFIX}.yml', 'r') as f:
     CONFIG_YML = f.read()
 
 GENESIS_JSON = None
-with open('genesis.json', 'r') as f:
+with open(f'genesis{CONFIG_SUFFIX}.json', 'r') as f:
     GENESIS_JSON = f.read()
-
-# (address: secret) pairs
-SECRET_JSON = {
-    '123463a4b065722e99115d6c222f267d9cabb524': '2e0834786285daccd064ca17f1654f67b4aef298acbb82cef9ec422fb4975622',
-    "d8669b5dda8df27c5c5045b47484f32b8f37d21f": "142284a67faaa8dd2249c3c09ff5a9e8e63b44054b2628b6ba7faa80789189f5",
-    "e289d16d744c2f2466545e0a3b46a106c21db4f6": "4e54680e88d63d01dd0dcf89969d33e8aa98ded7762365a898d7b191713b5257"
-}
 
 NUM_NODES = 3
 
 NODE_PATH: dict[int, Path] = {}
 GETH_PATH: dict[int, Path] = {}
+KEY_DIR = Path('keys-posdevnet').absolute()
 
 PEERS: List[str] = []
 GETH_PEERS: List[str] = []
@@ -53,6 +54,12 @@ GETH_PEERS: List[str] = []
 for i in range(1, NUM_NODES + 1):
     NODE_PATH[i] = DEVNET_PATH / f'node{i}'
     GETH_PATH[i] = NODE_PATH[i] / 'geth'
+
+# read addresses from keys
+ADDRESSES = []
+for i in range(1, NUM_NODES + 1):
+    with open(Path('keys-posdevnet') / f'key{i}.json', 'r') as f:
+        ADDRESSES.append(json.load(f)['address'])
 
 
 def setup():
@@ -76,10 +83,9 @@ def setup_node(no=1):
 
     subprocess.run(['geth', '--datadir=' + str(geth_path), '--db.engine=pebble',
                    'init', str(DEVNET_PATH / 'genesis.json')], capture_output=True, text=True)
-    with open(geth_path / 'secret.json', 'w') as f:
-        f.write(tuple(SECRET_JSON.values())[no - 1])
-    subprocess.run(['geth', '--datadir=' + str(geth_path), 'account', 'import',
-                   str(geth_path / 'secret.json')], input='\n\n', capture_output=True, text=True)
+
+    # copy key to the geth directory
+    shutil.copy(KEY_DIR / f'key{no}.json', geth_path / 'keystore' / 'key.json')
 
     with open(node_path / "jwt.hex", 'w') as f:
         f.write(subprocess.run(['openssl', 'rand', '-hex', '32'],
@@ -132,8 +138,8 @@ def start_node(no=1):
     node_path = NODE_PATH[no]
     geth_path = GETH_PATH[no]
 
-    geth_cmd = ['geth', '--http', '--http.api', "eth,engine", '--datadir=' + str(geth_path), '--allow-insecure-unlock', '--unlock=0x' + tuple(SECRET_JSON.keys())[no - 1], '--password=/dev/null', '--nodiscover', '--syncmode=full', '--authrpc.jwtsecret', str(
-        node_path / "jwt.hex"), '--port', str(peer_port(no)), '--http.port', str(http_port(no)), '--ws.port', str(ws_port(no)), '--authrpc.port', str(authrpc_port(no)), '--db.engine=pebble']
+    geth_cmd = ['geth', '--http', '--http.api', "eth,engine", '--datadir=' + str(geth_path), '--allow-insecure-unlock', '--unlock=0x' + ADDRESSES[no - 1], '--password=/dev/null', '--nodiscover', '--syncmode=full', '--authrpc.jwtsecret', str(
+        node_path / "jwt.hex"), '--port', str(peer_port(no)), '--http.port', str(http_port(no)), '--ws.port', str(ws_port(no)), '--authrpc.port', str(authrpc_port(no)), '--db.engine=pebble', '--mine', '--miner.etherbase=' + ADDRESSES[no - 1]]
 
     print('Starting Geth for node', no, ':', ' '.join(geth_cmd))
     geth_log = open(node_path / 'geth.log', 'w')
@@ -156,13 +162,15 @@ def start_node(no=1):
     # Before starting the beacon node, we need to generate the genesis state for it
     if not (node_path / 'genesis.ssz').exists():
         print('Generating genesis state for node', no, '...')
-        retry(lambda: subprocess.run(['prysmctl', 'testnet', 'generate-genesis', '--fork=bellatrix', '--num-validators=64', '--output-ssz=' + str(node_path / 'genesis.ssz'), '--chain-config-file=' + str(
+        retry(lambda: subprocess.run(['prysmctl', 'testnet', 'generate-genesis', '--num-validators=64', '--output-ssz=' + str(node_path / 'genesis.ssz'), '--chain-config-file=' + str(
             DEVNET_PATH / 'config.yml'), '--override-eth1data=true', '--geth-genesis-json-in=' + str(DEVNET_PATH / 'genesis.json'),  '--geth-genesis-json-out=' + str(DEVNET_PATH / 'genesis.json')]).returncode == 0)
+        # print current unix timestamp
+        print('Current unix timestamp:', int(time.time()))
 
     peers_argument = itertools.chain.from_iterable(
         [['--peer', peer] for peer in PEERS])
 
-    beacon_cmd = ['beacon-chain', '--datadir=' + str(node_path / 'beacondata'), '--min-sync-peers=0', '--genesis-state=' + str(node_path / 'genesis.ssz'), '--bootstrap-node=', '--chain-config-file=' + str(DEVNET_PATH / 'config.yml'), '--config-file=' + str(
+    beacon_cmd = ['beacon-chain', '--datadir=' + str(node_path / 'beacondata'), "--interop-eth1data-votes", '--min-sync-peers=0', '--genesis-state=' + str(node_path / 'genesis.ssz'), '--bootstrap-node=', '--chain-config-file=' + str(DEVNET_PATH / 'config.yml'), '--config-file=' + str(
         DEVNET_PATH / 'config.yml'), '--chain-id=32382', '--execution-endpoint=http://localhost:' + str(authrpc_port(no)), '--accept-terms-of-use', '--jwt-secret=' + str(node_path / "jwt.hex"), '--rpc-port', str(beacon_port(no)), '--no-discovery', *peers_argument]
 
     beacon_log = open(node_path / 'beacon.log', 'w')
@@ -178,7 +186,7 @@ def start_node(no=1):
 
     if no == 1:
         validator_cmd = ['validator', '--datadir=' + str(node_path / 'validatordata'), '--accept-terms-of-use', '--interop-num-validators=64', '--interop-start-index=0', '--force-clear-db', '--chain-config-file=' + str(
-            DEVNET_PATH / 'config.yml'), '--config-file=' + str(DEVNET_PATH / 'config.yml'), '--grpc-gateway-port', str(validator_grpc_port(no)), '--rpc-port', str(validator_rpc_port(no))]
+            DEVNET_PATH / 'config.yml'), '--config-file=' + str(DEVNET_PATH / 'config.yml'), '--grpc-gateway-port=' + str(validator_grpc_port(no)), '--rpc-port=' + str(validator_rpc_port(no)), '--beacon-rpc-provider=localhost:' + str(beacon_port(no))]
 
         validator_log = open(node_path / 'validator.log', 'w')
         print('Starting validator node', no, ':', ' '.join(validator_cmd))
@@ -206,7 +214,7 @@ def start_node(no=1):
 
     peer = retry(get_peer)
     if peer:
-        PEERS.append(retry(get_peer))
+        PEERS.append(peer)
     else:
         print("Could not get peer")
         return ()
@@ -247,10 +255,11 @@ if __name__ == '__main__':
     print("Nodes started, waiting x seconds...")
 
     if not TERMINAL:
-        run_in_curses(['tail', '-f', str(NODE_PATH[1] / 'geth.log')],
-                      ['tail', '-f', str(NODE_PATH[1] / 'beacon.log')])
-        run_in_curses(['tail', '-f', str(NODE_PATH[2] / 'geth.log')],
-                      ['tail', '-f', str(NODE_PATH[2] / 'beacon.log')])
+        run_in_curses([['tail', '-f', str(NODE_PATH[1] / 'geth.log')],
+                      ['tail', '-f', str(NODE_PATH[1] / 'beacon.log')],
+                      ['tail', '-f', str(NODE_PATH[1] / 'validator.log')]],
+                      [['tail', '-f', str(NODE_PATH[2] / 'geth.log')],
+                       ['tail', '-f', str(NODE_PATH[2] / 'beacon.log')]])
     else:
         input("Press enter to continue...")
 

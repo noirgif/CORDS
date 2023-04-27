@@ -1,6 +1,7 @@
 import curses
 import subprocess
 import threading
+from typing import List
 
 
 def execute_command(win, cmd):
@@ -12,29 +13,34 @@ def execute_command(win, cmd):
         win.addstr(line)
         win.refresh()
 
-def create_window(index, title):
+def create_window(xindex, yindex, title, total_x=2, total_y=2):
     max_y, max_x = curses.LINES, curses.COLS
-    window_height = max_y // 2
 
-    win = curses.newwin(window_height, max_x, index * window_height, 0)
+    window_width = max_x // total_x
+    window_height = max_y // total_y
+
+    win = curses.newwin(window_height - 1, window_width - 1, yindex * window_height, xindex * window_width)
     win.scrollok(True)
     win.addstr(0, 0, f"{title}\n")
     win.refresh()
     return win
 
-def run_in_curses(cmd_list_1, cmd_list_2):
+def run_in_curses(*node_cmd_lists: List[List[List[str]]]):
     def wrapper(stdscr):
         curses.curs_set(0)
-        win1 = create_window(0, " ".join(cmd_list_1))
-        win2 = create_window(1, " ".join(cmd_list_2))
+        threads = []
+        num_nodes = len(node_cmd_lists)
 
-        t1 = threading.Thread(target=execute_command, args=(win1, cmd_list_1))
-        t2 = threading.Thread(target=execute_command, args=(win2, cmd_list_2))
-        t1.start()
-        t2.start()
+        for node, cmd_list in enumerate(node_cmd_lists):
+            num_processes = len(cmd_list)
+            for index, cmd in enumerate(cmd_list):
+                win = create_window(index, node, " ".join(cmd), total_x=num_processes, total_y=num_nodes)
+                t = threading.Thread(target=execute_command, args=(win, cmd))
+                t.start()
+                threads.append(t)            
 
-        t1.join()
-        t2.join()
+        for t in threads:
+            t.join()
 
         stdscr.getch()
 
