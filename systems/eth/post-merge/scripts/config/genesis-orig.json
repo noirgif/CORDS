@@ -1,7 +1,6 @@
 {
 	"config": {
 		"chainId": 32382,
-		"consensus": "clique",
 		"homesteadBlock": 0,
 		"daoForkSupport": true,
 		"eip150Block": 0,
@@ -15,14 +14,14 @@
 		"muirGlacierBlock": 0,
 		"berlinBlock": 0,
 		"londonBlock": 0,
-		"terminalBlockHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
 		"arrowGlacierBlock": 0,
 		"grayGlacierBlock": 0,
+		"shanghaiTime": 1681499865,
+		"terminalTotalDifficulty": 0,
 		"clique": {
 			"period": 5,
 			"epoch": 30000
-		},
-		"terminalTotalDifficulty": 50
+		}
 	},
 	"nonce": "0x0",
 	"timestamp": "0x6439a649",
@@ -93,13 +92,13 @@
 		"dd2fd4581271e230360230f9337d5c0430bf44c0": {
 			"balance": "0x21e19e0c9bab2400000"
 		},
-		"d52bd13ac7b8312584c9b5204f603d11eec235d0": {
+		"df3e18d64bc6a983f673ab319ccae4f1a57c7097": {
 			"balance": "0x21e19e0c9bab2400000"
 		},
-		"e289d16d744c2f2466545e0a3b46a106c21db4f6": {
+		"f39fd6e51aad88f6f4ce6ab8827279cfffb92266": {
 			"balance": "0x21e19e0c9bab2400000"
 		},
-		"d8669b5dda8df27c5c5045b47484f32b8f37d21f": {
+		"fabb0ac9d68b0b445fb7357272ff202c5651694a": {
 			"balance": "0x21e19e0c9bab2400000"
 		}
 	},
