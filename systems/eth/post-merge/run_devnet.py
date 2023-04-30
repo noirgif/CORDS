@@ -33,11 +33,11 @@ if 'DEVNET_PATH' in os.environ:
 CONFIG_SUFFIX = ''
 
 CONFIG_YML = None
-with open(f'prysm{CONFIG_SUFFIX}.yml', 'r') as f:
+with open(f'config/prysm{CONFIG_SUFFIX}.yml', 'r') as f:
     CONFIG_YML = f.read()
 
 GENESIS_JSON = None
-with open(f'genesis{CONFIG_SUFFIX}.json', 'r') as f:
+with open(f'config/genesis{CONFIG_SUFFIX}.json', 'r') as f:
     GENESIS_JSON = f.read()
 
 NODE_PATH: dict[int, Path] = {}
