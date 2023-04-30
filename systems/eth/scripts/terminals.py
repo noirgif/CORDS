@@ -1,8 +1,16 @@
 import curses
+import os
 import subprocess
 import threading
 from typing import List
 
+
+def is_display_available():
+    try:
+        os.environ['DISPLAY']
+        return True
+    except KeyError:
+        return False
 
 def execute_command(win, cmd):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

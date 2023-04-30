@@ -16,9 +16,12 @@
 		"londonBlock": 0,
 		"arrowGlacierBlock": 0,
 		"grayGlacierBlock": 0,
-
-		"terminalTotalDifficulty": 1,
-		"shanghaiTime": 1
+		"shanghaiTime": 1681499865,
+		"terminalTotalDifficulty": 0,
+		"clique": {
+			"period": 5,
+			"epoch": 30000
+		}
 	},
 	"nonce": "0x0",
 	"timestamp": "0x6439a649",
@@ -87,6 +90,15 @@
 			"balance": "0x21e19e0c9bab2400000"
 		},
 		"dd2fd4581271e230360230f9337d5c0430bf44c0": {
+			"balance": "0x21e19e0c9bab2400000"
+		},
+		"df3e18d64bc6a983f673ab319ccae4f1a57c7097": {
+			"balance": "0x21e19e0c9bab2400000"
+		},
+		"f39fd6e51aad88f6f4ce6ab8827279cfffb92266": {
+			"balance": "0x21e19e0c9bab2400000"
+		},
+		"fabb0ac9d68b0b445fb7357272ff202c5651694a": {
 			"balance": "0x21e19e0c9bab2400000"
 		},
 		"d52bd13ac7b8312584c9b5204f603d11eec235d0": {

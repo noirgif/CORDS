@@ -9,30 +9,28 @@ import subprocess
 import signal
 from pathlib import Path
 from time import sleep
-import time
 from typing import List, Tuple
 from terminals import run_in_curses
 
 from web3 import Web3, IPCProvider
 
-
-def is_display_available():
-    try:
-        os.environ['DISPLAY']
-        return True
-    except KeyError:
-        return False
-
-
+# environment
 TERMINAL = False
 
 os.chdir(Path(__file__).parent)
 
+# config
+NUM_NODES = 3
+# which db for geth to use, leveldb(default) or pebble(new)
+DB_ENGINE = 'leveldb'
+
+# paths
 DEVNET_PATH = Path('/dev/shm/devnet')
 if 'DEVNET_PATH' in os.environ:
     DEVNET_PATH = Path(os.environ['DEVNET_PATH']).absolute()
 
-CONFIG_SUFFIX='-work'
+# decides which set of config files to use, -orig is the one from eth-pos-devnet
+CONFIG_SUFFIX = ''
 
 CONFIG_YML = None
 with open(f'prysm{CONFIG_SUFFIX}.yml', 'r') as f:
@@ -42,20 +40,21 @@ GENESIS_JSON = None
 with open(f'genesis{CONFIG_SUFFIX}.json', 'r') as f:
     GENESIS_JSON = f.read()
 
-NUM_NODES = 3
-
 NODE_PATH: dict[int, Path] = {}
 GETH_PATH: dict[int, Path] = {}
-KEY_DIR = Path('keys-posdevnet').absolute()
-
-PEERS: List[str] = []
-GETH_PEERS: List[str] = []
-
 for i in range(1, NUM_NODES + 1):
     NODE_PATH[i] = DEVNET_PATH / f'node{i}'
     GETH_PATH[i] = NODE_PATH[i] / 'geth'
 
-# read addresses from keys
+# path to secret keys
+KEY_DIR = Path('keys-posdevnet').absolute()
+
+
+# node configurations
+## beacon and geth peer addresses
+PEERS: List[str] = []
+GETH_PEERS: List[str] = []
+# read wallet addresses from keys
 ADDRESSES = []
 for i in range(1, NUM_NODES + 1):
     with open(Path('keys-posdevnet') / f'key{i}.json', 'r') as f:
@@ -81,7 +80,26 @@ def setup_node(no=1):
 
     print(f"Initializing node {no}...")
 
-    subprocess.run(['geth', '--datadir=' + str(geth_path), '--db.engine=pebble',
+     # Before starting the beacon node, we need to generate the genesis state for it
+    if not (DEVNET_PATH / 'genesis.ssz').exists():
+        print('Generating genesis state for node', no, '...')
+        prysmctl_cmd = [
+            'prysmctl',
+            'testnet',
+            'generate-genesis',
+            '--fork=bellatrix',
+            '--num-validators=64',
+            f'--output-ssz={DEVNET_PATH / "genesis.ssz"}',
+            f'--chain-config-file={DEVNET_PATH / "config.yml"}',
+            f'--geth-genesis-json-in={DEVNET_PATH / "genesis.json"}',
+            f'--geth-genesis-json-out={DEVNET_PATH / "genesis.json"}',
+        ]
+
+        retry(lambda: subprocess.run(prysmctl_cmd).returncode == 0)
+        # print current unix timestamp
+        # print('Current unix timestamp:', int(time.time()))
+
+    subprocess.run(['geth', '--datadir=' + str(geth_path), f'--db.engine={DB_ENGINE}',
                    'init', str(DEVNET_PATH / 'genesis.json')], capture_output=True, text=True)
 
     # copy key to the geth directory
@@ -92,16 +110,16 @@ def setup_node(no=1):
                 capture_output=True, text=True).stdout.strip())
 
 
-def http_port(no=1):
-    return 8545 + (no - 1) * 3
+def geth_http_port(no=1):
+    return 8545 + (no - 1) * 15
 
 
-def ws_port(no=1):
-    return 8546 + (no - 1) * 3
+def geth_ws_port(no=1):
+    return 8546 + (no - 1) * 15
 
 
-def authrpc_port(no=1):
-    return 8547 + (no - 1) * 3
+def geth_authrpc_port(no=1):
+    return 8551 + (no - 1) * 15
 
 
 def peer_port(no=1):
@@ -110,6 +128,14 @@ def peer_port(no=1):
 
 def beacon_port(no=1):
     return 4000 + (no - 1)
+
+
+def beacon_grpc_port(no=1):
+    return 3500 + (no - 1)
+
+
+def beacon_monitoring_port(no=1):
+    return 8000 + (no - 1)
 
 
 def validator_grpc_port(no=1):
@@ -138,8 +164,24 @@ def start_node(no=1):
     node_path = NODE_PATH[no]
     geth_path = GETH_PATH[no]
 
-    geth_cmd = ['geth', '--http', '--http.api', "eth,engine", '--datadir=' + str(geth_path), '--allow-insecure-unlock', '--unlock=0x' + ADDRESSES[no - 1], '--password=/dev/null', '--nodiscover', '--syncmode=full', '--authrpc.jwtsecret', str(
-        node_path / "jwt.hex"), '--port', str(peer_port(no)), '--http.port', str(http_port(no)), '--ws.port', str(ws_port(no)), '--authrpc.port', str(authrpc_port(no)), '--db.engine=pebble', '--mine', '--miner.etherbase=' + ADDRESSES[no - 1]]
+    geth_cmd = [
+        'geth',
+        '--http',
+        '--http.api=eth,engine',
+        f'--datadir={geth_path}',
+        '--allow-insecure-unlock',
+        f'--unlock=0x{ADDRESSES[no - 1]}',
+        '--password=/dev/null',
+        '--nodiscover',
+        '--syncmode=full',
+        f'--authrpc.jwtsecret={node_path / "jwt.hex"}',
+        f'--port={peer_port(no)}',
+        f'--http.port={geth_http_port(no)}',
+        f'--ws.port={geth_ws_port(no)}',
+        f'--authrpc.port={geth_authrpc_port(no)}',
+        '--mine',
+        f'--miner.etherbase={ADDRESSES[no - 1]}',
+    ]
 
     print('Starting Geth for node', no, ':', ' '.join(geth_cmd))
     geth_log = open(node_path / 'geth.log', 'w')
@@ -159,19 +201,31 @@ def start_node(no=1):
     enodeUrl = node.geth.admin.node_info()['enode']
     GETH_PEERS.append(enodeUrl)
 
-    # Before starting the beacon node, we need to generate the genesis state for it
-    if not (node_path / 'genesis.ssz').exists():
-        print('Generating genesis state for node', no, '...')
-        retry(lambda: subprocess.run(['prysmctl', 'testnet', 'generate-genesis', '--num-validators=64', '--output-ssz=' + str(node_path / 'genesis.ssz'), '--chain-config-file=' + str(
-            DEVNET_PATH / 'config.yml'), '--override-eth1data=true', '--geth-genesis-json-in=' + str(DEVNET_PATH / 'genesis.json'),  '--geth-genesis-json-out=' + str(DEVNET_PATH / 'genesis.json')]).returncode == 0)
-        # print current unix timestamp
-        print('Current unix timestamp:', int(time.time()))
+    # wait for some time
+    retry(lambda: geth_proc.poll() is None)
 
     peers_argument = itertools.chain.from_iterable(
         [['--peer', peer] for peer in PEERS])
 
-    beacon_cmd = ['beacon-chain', '--datadir=' + str(node_path / 'beacondata'), "--interop-eth1data-votes", '--min-sync-peers=0', '--genesis-state=' + str(node_path / 'genesis.ssz'), '--bootstrap-node=', '--chain-config-file=' + str(DEVNET_PATH / 'config.yml'), '--config-file=' + str(
-        DEVNET_PATH / 'config.yml'), '--chain-id=32382', '--execution-endpoint=http://localhost:' + str(authrpc_port(no)), '--accept-terms-of-use', '--jwt-secret=' + str(node_path / "jwt.hex"), '--rpc-port', str(beacon_port(no)), '--no-discovery', *peers_argument]
+    beacon_cmd = [
+        'beacon-chain',
+        f"--datadir={node_path / 'beacondata'}",
+        '--min-sync-peers=0',
+        f"--genesis-state={DEVNET_PATH / 'genesis.ssz'}",
+        "--interop-eth1data-votes",
+        '--bootstrap-node=',
+        f'--chain-config-file={DEVNET_PATH / "config.yml"}',
+        '--chain-id=32382',
+        '--rpc-host=127.0.0.1',
+        f'--rpc-port={beacon_port(no)}',
+        '--grpc-gateway-host=127.0.0.1',
+        f'--grpc-gateway-port={beacon_grpc_port(no)}',
+        f'--execution-endpoint=http://localhost:{geth_authrpc_port(no)}',
+        '--accept-terms-of-use',
+        f'--jwt-secret={node_path / "jwt.hex"}',
+
+        f'--suggested-fee-recipient=0x{ADDRESSES[no - 1]}',
+        *peers_argument]
 
     beacon_log = open(node_path / 'beacon.log', 'w')
     print('Starting beacon node', no, ':', ' '.join(beacon_cmd))
@@ -185,8 +239,17 @@ def start_node(no=1):
     validator_proc = None
 
     if no == 1:
-        validator_cmd = ['validator', '--datadir=' + str(node_path / 'validatordata'), '--accept-terms-of-use', '--interop-num-validators=64', '--interop-start-index=0', '--force-clear-db', '--chain-config-file=' + str(
-            DEVNET_PATH / 'config.yml'), '--config-file=' + str(DEVNET_PATH / 'config.yml'), '--grpc-gateway-port=' + str(validator_grpc_port(no)), '--rpc-port=' + str(validator_rpc_port(no)), '--beacon-rpc-provider=localhost:' + str(beacon_port(no))]
+        validator_cmd = [
+            'validator',
+            f'--beacon-rpc-provider=127.0.0.1:{beacon_port(no)}',
+            f'--datadir={node_path / "validatordata"}',
+            '--accept-terms-of-use',
+            '--interop-num-validators=64',
+            '--interop-start-index=0',
+            f'--chain-config-file={DEVNET_PATH / "config.yml"}',
+            f'--grpc-gateway-port={validator_grpc_port(no)}',
+            f'--rpc-port={validator_rpc_port(no)}',
+        ]
 
         validator_log = open(node_path / 'validator.log', 'w')
         print('Starting validator node', no, ':', ' '.join(validator_cmd))
@@ -247,19 +310,23 @@ if __name__ == '__main__':
 
     setup()
     setup_node(1)
-    setup_node(2)
+    # setup_node(2)
 
     clients = start_node(1)
-    clients2 = start_node(2)
+    # clients2 = start_node(2)
+    clients2 = []
 
     print("Nodes started, waiting x seconds...")
 
     if not TERMINAL:
-        run_in_curses([['tail', '-f', str(NODE_PATH[1] / 'geth.log')],
-                      ['tail', '-f', str(NODE_PATH[1] / 'beacon.log')],
-                      ['tail', '-f', str(NODE_PATH[1] / 'validator.log')]],
-                      [['tail', '-f', str(NODE_PATH[2] / 'geth.log')],
-                       ['tail', '-f', str(NODE_PATH[2] / 'beacon.log')]])
+        pass
+    if False:
+        run_in_curses([['tail', '-f', str(NODE_PATH[1] / 'geth.log')]],
+                      [['tail', '-f', str(NODE_PATH[1] / 'beacon.log')]],
+                      [['tail', '-f', str(NODE_PATH[1] / 'validator.log')]],
+                      # [['tail', '-f', str(NODE_PATH[2] / 'geth.log')],
+                      # ['tail', '-f', str(NODE_PATH[2] / 'beacon.log')]]
+                      )
     else:
         input("Press enter to continue...")
 
