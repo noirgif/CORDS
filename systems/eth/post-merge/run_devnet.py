@@ -9,7 +9,6 @@ import subprocess
 import signal
 from pathlib import Path
 from time import sleep
-from typing import List, Tuple
 from terminals import run_in_curses
 
 from web3 import Web3, IPCProvider
@@ -22,7 +21,7 @@ os.chdir(Path(__file__).parent)
 # config
 NUM_NODES = 3
 # which db for geth to use, leveldb(default) or pebble(new)
-DB_ENGINE = 'leveldb'
+DB_ENGINE = 'pebble'
 
 # paths
 DEVNET_PATH = Path('/dev/shm/devnet')
@@ -51,14 +50,35 @@ KEY_DIR = Path('keys-posdevnet').absolute()
 
 
 # node configurations
-## beacon and geth peer addresses
-PEERS: List[str] = []
-GETH_PEERS: List[str] = []
+# beacon and geth peer addresses
+PEERS: list[str] = []
+GETH_PEERS: list[str] = []
 # read wallet addresses from keys
 ADDRESSES = []
 for i in range(1, NUM_NODES + 1):
     with open(Path('keys-posdevnet') / f'key{i}.json', 'r') as f:
         ADDRESSES.append(json.load(f)['address'])
+
+
+# ports
+def new_port_assignment(base, step):
+    # assign new ports to each node to avoid conflicts
+    def port(no=1):
+        return base + (no - 1) * step
+    return port
+
+
+geth_http_port = new_port_assignment(8545, 15)
+geth_ws_port = new_port_assignment(8546, 15)
+geth_authrpc_port = new_port_assignment(8551, 15)
+geth_peer_port = new_port_assignment(30303, 1)
+beacon_port = new_port_assignment(4000, 1)
+beacon_grpc_port = new_port_assignment(3500, 1)
+beacon_p2p_udp_port = new_port_assignment(12000, 1)
+beacon_p2p_tcp_port = new_port_assignment(13000, 1)
+beacon_monitoring_port = new_port_assignment(8000, 1)
+validator_grpc_port = new_port_assignment(7500, 1)
+validator_rpc_port = new_port_assignment(7000, 1)
 
 
 def setup():
@@ -80,7 +100,7 @@ def setup_node(no=1):
 
     print(f"Initializing node {no}...")
 
-     # Before starting the beacon node, we need to generate the genesis state for it
+    # Before starting the beacon node, we need to generate the genesis state for it
     if not (DEVNET_PATH / 'genesis.ssz').exists():
         print('Generating genesis state for node', no, '...')
         prysmctl_cmd = [
@@ -110,42 +130,6 @@ def setup_node(no=1):
                 capture_output=True, text=True).stdout.strip())
 
 
-def geth_http_port(no=1):
-    return 8545 + (no - 1) * 15
-
-
-def geth_ws_port(no=1):
-    return 8546 + (no - 1) * 15
-
-
-def geth_authrpc_port(no=1):
-    return 8551 + (no - 1) * 15
-
-
-def peer_port(no=1):
-    return 30303 + (no - 1)
-
-
-def beacon_port(no=1):
-    return 4000 + (no - 1)
-
-
-def beacon_grpc_port(no=1):
-    return 3500 + (no - 1)
-
-
-def beacon_monitoring_port(no=1):
-    return 8000 + (no - 1)
-
-
-def validator_grpc_port(no=1):
-    return 7500 + (no - 1)
-
-
-def validator_rpc_port(no=1):
-    return 7000 + (no - 1)
-
-
 def retry(func, *args, **kwargs):
     for delay in [1, 2, 4]:
         try:
@@ -158,7 +142,7 @@ def retry(func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
-def start_node(no=1):
+def start_node(no=1) -> list[subprocess.Popen]:
     """Starts a node with the given number
     Returns the processes for geth, beacon and validator"""
     node_path = NODE_PATH[no]
@@ -175,7 +159,7 @@ def start_node(no=1):
         '--nodiscover',
         '--syncmode=full',
         f'--authrpc.jwtsecret={node_path / "jwt.hex"}',
-        f'--port={peer_port(no)}',
+        f'--port={geth_peer_port(no)}',
         f'--http.port={geth_http_port(no)}',
         f'--ws.port={geth_ws_port(no)}',
         f'--authrpc.port={geth_authrpc_port(no)}',
@@ -197,20 +181,19 @@ def start_node(no=1):
     retry(lambda: ipc_path.exists())
     node = Web3(IPCProvider(str(ipc_path)))
     for peer in GETH_PEERS:
-        node.geth.admin.add_peer(peer)
+        if node.geth.admin.add_peer(peer):
+            print('Successfully added peer', peer)
+        else:
+            print('Failed to connect to peer', peer)
     enodeUrl = node.geth.admin.node_info()['enode']
     GETH_PEERS.append(enodeUrl)
 
-    # wait for some time
-    retry(lambda: geth_proc.poll() is None)
-
-    peers_argument = itertools.chain.from_iterable(
-        [['--peer', peer] for peer in PEERS])
-
+    # start beacon node
+    beacon_peer_arguments = [f'--peer={peer}' for peer in PEERS]
     beacon_cmd = [
         'beacon-chain',
         f"--datadir={node_path / 'beacondata'}",
-        '--min-sync-peers=0',
+        f'--min-sync-peers={no-1}',
         f"--genesis-state={DEVNET_PATH / 'genesis.ssz'}",
         "--interop-eth1data-votes",
         '--bootstrap-node=',
@@ -220,12 +203,14 @@ def start_node(no=1):
         f'--rpc-port={beacon_port(no)}',
         '--grpc-gateway-host=127.0.0.1',
         f'--grpc-gateway-port={beacon_grpc_port(no)}',
-        f'--execution-endpoint=http://localhost:{geth_authrpc_port(no)}',
+        f'--p2p-tcp-port={beacon_p2p_tcp_port(no)}',
+        f'--p2p-udp-port={beacon_p2p_udp_port(no)}',
+        f'--execution-endpoint=http://localhost:{geth_authrpc_port(1)}',
         '--accept-terms-of-use',
-        f'--jwt-secret={node_path / "jwt.hex"}',
+        f'--jwt-secret={NODE_PATH[1] / "jwt.hex"}',
 
         f'--suggested-fee-recipient=0x{ADDRESSES[no - 1]}',
-        *peers_argument]
+        *beacon_peer_arguments]
 
     beacon_log = open(node_path / 'beacon.log', 'w')
     print('Starting beacon node', no, ':', ' '.join(beacon_cmd))
@@ -260,7 +245,7 @@ def start_node(no=1):
             validator_proc = subprocess.Popen(
                 validator_cmd, stdout=validator_log, stderr=validator_log, text=True)
 
-    # if it is the first node, we add it to the peers list
+    # we add it to the peers list for later beacon nodes to connect
     def get_peer():
         peer_result = subprocess.run(
             ['curl', 'localhost:8080/p2p'], capture_output=True, text=True).stdout.strip()
@@ -280,47 +265,50 @@ def start_node(no=1):
         PEERS.append(peer)
     else:
         print("Could not get peer")
-        return ()
+        return []
 
-    return geth_proc, beacon_proc, validator_proc
+    return list(filter(None, [geth_proc, beacon_proc, validator_proc]))
 
 
-def send_interrupt(*procs: Tuple[List[subprocess.Popen]]):
+def send_interrupt(*procs: tuple[list[subprocess.Popen]]):
     for proc in itertools.chain.from_iterable(procs):
         if proc is None:
             continue
         os.kill(proc.pid, signal.SIGINT)
 
 
-def check_error(*procs: Tuple[List[subprocess.Popen]] | Tuple[dict[subprocess.Popen, int]]):
+def check_error(*procs: list[subprocess.Popen | None]):
     for ind, proc_group in enumerate(procs):
         for proc in proc_group:
             if proc is None:
                 continue
-            name = 'Node ' + str(ind) + ' ' + proc.args[0]
+            name = f'Node {ind} {proc.args[0]}'
             if proc.returncode != 0:
-                print(f"{name} ended with error")
+                if proc.poll() is None:
+                    print(f"{name} running...")
+                else:
+                    print(f"{name} ended with error")
             else:
                 print(f"{name} ended successfully")
 
 
 if __name__ == '__main__':
-    os.system(f"killall -SIGINT validator geth beacon-chain")
-    os.system(f"rm -rf {DEVNET_PATH}")
+    os.system(f"killall validator geth beacon-chain")
+    if DEVNET_PATH.exists():
+        retry(os.system, f"rm -r {DEVNET_PATH}")
 
     setup()
     setup_node(1)
-    # setup_node(2)
+    setup_node(2)
 
     clients = start_node(1)
-    # clients2 = start_node(2)
-    clients2 = []
+    sleep(10)
+    clients2 = start_node(2)
+    # clients2 = []
 
     print("Nodes started, waiting x seconds...")
 
-    if not TERMINAL:
-        pass
-    if False:
+    if not TERMINAL and False:
         run_in_curses([['tail', '-f', str(NODE_PATH[1] / 'geth.log')]],
                       [['tail', '-f', str(NODE_PATH[1] / 'beacon.log')]],
                       [['tail', '-f', str(NODE_PATH[1] / 'validator.log')]],
