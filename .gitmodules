@@ -5,3 +5,6 @@
 [submodule "systems/tikv/tidb-docker-compose"]
 	path = systems/tikv/tidb-docker-compose
 	url = git@github.com:noirgif/tidb-docker-compose
+[submodule "systems/eth/post-merge"]
+	path = systems/eth/post-merge
+	url = git@github.com:noirgif/postmerge-devnet
