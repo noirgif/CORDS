@@ -1,0 +1,11 @@
+data-path = "workdir/node-3.mp"
+node-private-key-file = "config/keys/node-3"
+discovery-enabled = false
+static-nodes-file = "config/static-nodes.json"
+rpc-http-host = "127.0.0.1"
+rpc-http-port = 8547
+p2p-host = "127.0.0.1"
+p2p-interface = "127.0.0.1"
+p2p-port = 30305
+genesis-file = "config/genesis.json"
+rpc-http-api = [ "ETH", "NET", "WEB3", "ADMIN",]
